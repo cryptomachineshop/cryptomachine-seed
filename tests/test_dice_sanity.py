@@ -1,66 +1,204 @@
-from core.dice_sanity import analyze_dice
-
-
-NORMAL = (
-    "123456"
-    "615243"
-    "362514"
-    "451326"
-    "246135"
-    "531642"
-    "164253"
-    "325416"
-    "642531"
+from core.dice_sanity import (
+    analyze_dice,
+    analyze_five_dice,
 )
 
-MISSING_FACE = "12345123451234512345123451234512345123451234512345"
 
-LONG_REPEAT = "123456" + ("4" * 9) + "123456123456123456"
+def test_balanced_aggregate():
+    dice = "123456" * 9
 
-GROSSLY_BIASED = ("1" * 40) + "23456234562345623456"
+    result = analyze_dice(dice)
 
-
-normal = analyze_dice(NORMAL)
-
-print("Normal counts:", normal["counts"])
-print("Normal warnings:", normal["warnings"])
-print()
-
-if normal["warnings"]:
-    raise SystemExit("FAIL: Normal test sequence produced a warning.")
+    assert result["total"] == 54
+    assert result["missing_faces"] == []
+    assert result["longest_run"] == 1
+    assert result["warnings"] == []
 
 
-missing = analyze_dice(MISSING_FACE)
+def test_missing_face_warning():
+    dice = "12345" * 10
 
-print("Missing-face warnings:")
-for warning in missing["warnings"]:
-    print(" -", warning)
-print()
+    result = analyze_dice(dice)
 
-if not any("never appeared" in w for w in missing["warnings"]):
-    raise SystemExit("FAIL: Missing face was not detected.")
+    assert "6" in result["missing_faces"]
+    assert result["warnings"]
 
 
-repeat = analyze_dice(LONG_REPEAT)
+def test_long_run_warning():
+    dice = "123456" * 8 + "111111111"
 
-print("Repeated-run warnings:")
-for warning in repeat["warnings"]:
-    print(" -", warning)
-print()
+    result = analyze_dice(dice)
 
-if repeat["longest_run"] < 8:
-    raise SystemExit("FAIL: Long repeated run was not detected.")
+    assert result["longest_run"] >= 9
+    assert result["warnings"]
 
 
-biased = analyze_dice(GROSSLY_BIASED)
+def test_gross_combined_bias_warning():
+    dice = "1" * 40 + "23456234562345623456"
 
-print("Gross-bias warnings:")
-for warning in biased["warnings"]:
-    print(" -", warning)
-print()
+    result = analyze_dice(dice)
 
-if not any("much more often" in w for w in biased["warnings"]):
-    raise SystemExit("FAIL: Gross imbalance was not detected.")
+    assert result["counts"]["1"] == 40
+    assert result["warnings"]
 
 
-print("PASS: Dice sanity-check tests passed.")
+def test_per_die_normal_pattern():
+    shakes = [
+        "12345",
+        "23456",
+        "34561",
+        "45612",
+        "56123",
+        "61234",
+        "12345",
+        "23456",
+        "34561",
+        "45612",
+    ]
+
+    dice = "".join(shakes)
+
+    result = analyze_five_dice(dice)
+
+    assert result["rolls_per_die"] == 10
+    assert result["warnings"] == []
+
+    for die_name in (
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+    ):
+        assert (
+            result["per_die"][die_name]["rolls"]
+            == 10
+        )
+
+
+def test_stuck_die_detected():
+    shakes = [
+        "61234",
+        "62345",
+        "63456",
+        "64561",
+        "65612",
+        "66123",
+        "61234",
+        "62345",
+        "63456",
+        "64561",
+    ]
+
+    dice = "".join(shakes)
+
+    result = analyze_five_dice(dice)
+
+    d1 = result["per_die"]["D1"]
+
+    assert d1["counts"]["6"] == 10
+    assert d1["warnings"]
+
+    assert any(
+        "D1 produced the same face"
+        in warning
+        for warning in result["warnings"]
+    )
+
+
+def test_heavy_single_die_bias_detected():
+    d1 = "1111111123"
+    d2 = "1234561234"
+    d3 = "2345612345"
+    d4 = "3456123456"
+    d5 = "4561234561"
+
+    dice = "".join(
+        d1[index]
+        + d2[index]
+        + d3[index]
+        + d4[index]
+        + d5[index]
+        for index in range(10)
+    )
+
+    result = analyze_five_dice(dice)
+
+    assert result["per_die"]["D1"]["counts"]["1"] == 8
+
+    assert any(
+        "D1 produced face 1 on 8 of 10 shakes."
+        == warning
+        for warning in result["warnings"]
+    )
+
+
+def test_per_die_long_run_detected():
+    d1 = "1111112345"
+    d2 = "1234561234"
+    d3 = "2345612345"
+    d4 = "3456123456"
+    d5 = "4561234561"
+
+    dice = "".join(
+        d1[index]
+        + d2[index]
+        + d3[index]
+        + d4[index]
+        + d5[index]
+        for index in range(10)
+    )
+
+    result = analyze_five_dice(dice)
+
+    assert (
+        result["per_die"]["D1"]["longest_run"]
+        == 6
+    )
+
+    assert any(
+        "D1 produced the same face for 6 "
+        "consecutive shakes."
+        == warning
+        for warning in result["warnings"]
+    )
+
+
+def test_incomplete_shake_rejected():
+    try:
+        analyze_five_dice("123456")
+
+    except ValueError:
+        pass
+
+    else:
+        raise AssertionError(
+            "Incomplete five-dice stream "
+            "was not rejected"
+        )
+
+
+def main():
+    tests = [
+        test_balanced_aggregate,
+        test_missing_face_warning,
+        test_long_run_warning,
+        test_gross_combined_bias_warning,
+        test_per_die_normal_pattern,
+        test_stuck_die_detected,
+        test_heavy_single_die_bias_detected,
+        test_per_die_long_run_detected,
+        test_incomplete_shake_rejected,
+    ]
+
+    for test in tests:
+        test()
+
+    print(
+        "PASS: aggregate and per-die "
+        "sanity checks passed"
+    )
+
+
+if __name__ == "__main__":
+    main()

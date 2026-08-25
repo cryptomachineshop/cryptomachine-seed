@@ -1,26 +1,29 @@
 from core.dice_policy import validate_outcome_count
+from core.dice_sanity import analyze_five_dice
 from core.reference_engine import dice_to_mnemonic
-from core.dice_sanity import analyze_dice
 
 
 def create_seed_from_dice(dice, word_count):
     """
-    Production CryptoMachine dice-to-mnemonic workflow.
+    Production V1 dice-to-mnemonic entry point.
 
-    Enforces the official CryptoMachine dice count:
-      12 words -> 50 outcomes
-      24 words -> 100 outcomes
+    This function:
 
-    Returns:
-        {
-            "mnemonic": "...",
-            "sanity": {...}
-        }
+    1. Enforces the exact V1 dice outcome count.
+    2. Runs aggregate and per-die sanity analysis.
+    3. Generates the deterministic BIP39 mnemonic.
+    4. Returns the mnemonic plus sanity information.
+
+    Sanity warnings do not alter the cryptographic result.
+    They are informational warnings for the user.
     """
 
-    validate_outcome_count(dice, word_count)
+    validate_outcome_count(
+        dice,
+        word_count,
+    )
 
-    sanity = analyze_dice(dice)
+    sanity = analyze_five_dice(dice)
 
     mnemonic = dice_to_mnemonic(
         dice,
