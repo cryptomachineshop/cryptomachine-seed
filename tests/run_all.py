@@ -9,8 +9,8 @@ TESTS = [
     "tests.test_reference_engine",
     "tests.test_checksum_words",
     "tests.test_mnemonic_validator",
+    "tests.test_dice_sanity",
 ]
-
 
 print("=" * 60)
 print("CryptoMachine Seed Generator - Core Test Suite")
