@@ -1,34 +1,31 @@
-# Entropy Specification
+# CryptoMachine Seed Generator
+## Entropy Specification
 
-Status: DRAFT v0.1
+Status: V1 DEVELOPMENT SPECIFICATION
 
-This document defines how CryptoMachine Seed Generator will convert physical dice input into BIP39 entropy.
+This document defines the current CryptoMachine dice-to-BIP39 behavior.
 
-Nothing in this document should be considered final until the algorithm has been independently reviewed and verified against known test vectors.
+The implementation must remain deterministic, independently reproducible, and covered by automated known-answer tests.
 
 ## 1. Entropy source
 
 CryptoMachine does not generate seed entropy internally.
 
-The user supplies entropy using five physical six-sided dice (D6).
+The user supplies physical entropy using five six-sided dice (D6).
 
-Each die has a permanent identity based on its color or other visible marking.
+The five dice have fixed identities. Production units are intended to use five distinguishable dice.
 
-The touchscreen always requests the dice in the same fixed order:
+The UI must not rely on color alone. Each die should also have a fixed position, number, letter, or symbol.
+
+## 2. Dice order
+
+Every shake is entered in the same fixed order:
 
 D1
 D2
 D3
 D4
 D5
-
-Color must not be the only identifier. The production UI should also identify each die by position, number, letter, or symbol.
-
-## 2. One shake
-
-The user shakes all five dice physically.
-
-The five results are entered in fixed D1 through D5 order.
 
 Example:
 
@@ -38,15 +35,15 @@ D3 = 4
 D4 = 1
 D5 = 5
 
-The canonical representation of that shake is:
+The canonical representation is:
 
 62415
 
-No commas, spaces, separators, or hidden values are added.
+No commas, spaces, timestamps, device identifiers, hidden values, or separators are added.
 
 ## 3. Multiple shakes
 
-Each confirmed shake is appended to the previous results in exact entered order.
+Each confirmed five-dice result is appended directly to the previous result.
 
 Example:
 
@@ -58,116 +55,191 @@ Canonical dice string:
 
 624153512644321
 
-The exact canonical dice string must be reproducible by an independent implementation.
+The exact entered sequence determines the result.
 
-## 4. 12-word mode
+## 4. 12-word production mode
 
-BIP39 requires 128 bits of initial entropy for a 12-word mnemonic.
+12-word mode requires:
 
-The final required number of physical dice outcomes is NOT YET LOCKED.
+5 dice
+x 10 shakes
+= 50 dice outcomes
 
-Candidates to evaluate:
+The 50-character dice string is encoded as ASCII and hashed with SHA-256.
 
-- 50 outcomes for compatibility with established dice workflows
-- 75 outcomes for additional margin against ordinary physical dice bias
+The first 16 bytes of the SHA-256 digest are used as the 128-bit BIP39 entropy.
 
-The complete canonical dice string will be processed by SHA-256.
+BIP39 then adds a 4-bit checksum.
 
-The method used to derive exactly 128 bits from the SHA-256 result must be explicitly documented, tested, and independently reviewed before release.
-
-## 5. 24-word mode
-
-BIP39 requires 256 bits of initial entropy for a 24-word mnemonic.
-
-The final required number of physical dice outcomes is NOT YET LOCKED.
-
-Candidates to evaluate:
-
-- 99 outcomes for compatibility with established SeedSigner-style workflows
-- 100 outcomes for exactly 20 five-dice shakes
-- 150 outcomes for additional margin against ordinary physical dice bias
-
-The complete canonical dice string will be processed by SHA-256.
-
-The 256-bit SHA-256 result can then serve as the BIP39 entropy if this method is confirmed during review and compatibility testing.
-
-## 6. BIP39 conversion
-
-The resulting entropy is converted according to BIP39.
-
-For 12 words:
+Result:
 
 128 entropy bits
 + 4 checksum bits
 = 132 bits
-= 12 groups of 11 bits
+= 12 BIP39 words
 
-For 24 words:
+A published external 50-outcome reference vector is included in the automated test suite.
+
+## 5. 24-word production mode
+
+24-word mode requires:
+
+5 dice
+x 20 shakes
+= 100 dice outcomes
+
+The 100-character dice string is encoded as ASCII and hashed with SHA-256.
+
+The complete 32-byte SHA-256 digest is used as the 256-bit BIP39 entropy.
+
+BIP39 then adds an 8-bit checksum.
+
+Result:
 
 256 entropy bits
 + 8 checksum bits
 = 264 bits
-= 24 groups of 11 bits
+= 24 BIP39 words
 
-Each 11-bit value indexes the official 2048-word BIP39 English word list.
+CryptoMachine production mode requires exactly 100 outcomes.
 
-Internal BIP39 indexes are 0 through 2047.
+## 6. 99-outcome compatibility reference
 
-If the user interface displays word numbers as 0001 through 2048, that display conversion must be separately tested to prevent an off-by-one error.
+The project retains a published 99-outcome SeedSigner-style test vector.
 
-## 7. Security requirements
+This exists for:
 
-- Dice input must never be intentionally written to persistent storage.
-- Derived entropy must never be intentionally written to persistent storage.
-- Mnemonic words must never be intentionally written to persistent storage.
-- Production logs must never contain dice input, entropy, hashes, word indexes, or mnemonic words.
-- Sensitive RAM buffers must be explicitly wiped at the end of the session.
-- Sensitive RAM must also be handled correctly on cancel, reset, timeout, and abnormal restart.
-- The compiler must not be allowed to optimize away sensitive-memory wiping.
+- independent verification
+- compatibility testing
+- regression testing
 
-## 8. Determinism
+It is not the normal CryptoMachine production workflow.
 
-The same valid dice sequence must always generate exactly the same result.
+Production 24-word mode uses 100 outcomes so the customer completes exactly 20 full five-dice shakes.
 
-No:
+## 7. BIP39 word indexing
+
+BIP39 uses an ordered English word list containing exactly 2048 words.
+
+Internal word indexes are:
+
+0 through 2047
+
+If the touchscreen displays human-friendly word numbers:
+
+0001 through 2048
+
+that display conversion must remain separate from the internal BIP39 index and must be tested for off-by-one errors.
+
+## 8. Dice sanity checks
+
+CryptoMachine may perform simple sanity checks on the entered sequence.
+
+Current checks include warnings for:
+
+- one or more faces never appearing
+- unusually long repeated runs
+- grossly disproportionate face counts
+
+These checks are warnings only.
+
+They do not prove that physical dice are fair.
+They do not measure the exact entropy of a sequence.
+They do not certify that a seed is secure.
+
+A warning should allow the user to restart the ceremony or deliberately continue.
+
+## 9. Determinism
+
+The same exact dice sequence must always generate the same mnemonic.
+
+Mnemonic generation must never depend on:
 
 - device RNG
-- timestamp
+- clock or timestamp
 - serial number
 - hardware identifier
-- counter
+- session counter
 - hidden salt
-- CryptoMachine-specific secret
+- CryptoMachine secret
+- network source
 
-may influence mnemonic generation.
+## 10. Sensitive data
 
-## 9. Verification
+The following are considered sensitive during a live seed ceremony:
 
-Before release, the implementation must include automated known-answer tests.
+- entered dice sequence
+- SHA-256 result
+- derived entropy
+- BIP39 checksum working data
+- mnemonic indexes
+- mnemonic words
+- temporary UI copies of those values
 
-Testing should include:
+Production firmware must not intentionally write this information to:
 
-- published BIP39 test vectors
-- independent dice-to-mnemonic test vectors
-- SeedSigner-compatible vectors where applicable
-- 12-word mode
-- 24-word mode
-- repeated dice values
-- boundary cases
-- undo and re-entry behavior
-- BIP39 word indexing
-- checksum generation
+- flash
+- TF or microSD
+- logs
+- debug output
+- configuration storage
+- crash dumps
 
-Any firmware change that alters a known expected mnemonic must cause the automated test suite to fail.
+Sensitive working memory must be explicitly cleared after use.
 
-## 10. Open questions
+Cleanup behavior must also be reviewed for:
 
-Before this specification becomes v1.0, resolve:
+- cancellation
+- inactivity timeout
+- reset
+- power interruption
+- abnormal restart
+- next boot
 
-1. Final number of dice outcomes for 12-word mode.
-2. Final number of dice outcomes for 24-word mode.
-3. Exact 128-bit derivation rule for 12-word mode.
-4. Whether SeedSigner compatibility should be an explicit mode.
-5. Whether entropy sanity checks should warn about obviously suspicious dice sequences.
-6. How much additional entropy margin is appropriate for inexpensive consumer dice.
-7. Exact RAM zeroization implementation on RP2350.
+## 11. Current production test vector
+
+The current CryptoMachine 100-outcome reference input is:
+
+1234561234561234561234561234561234561234561234561234561234561234561234561234561234561234561234561234
+
+Expected 24-word mnemonic:
+
+tornado cactus wheel picture target finish home neither trend picture shoulder endless deputy glide open oxygen another ability forum swear side alcohol devote random
+
+This vector must remain in the automated test suite.
+
+Any code change that causes this result to change must fail testing.
+
+## 12. External reference vectors
+
+The automated tests also retain known external vectors for:
+
+- 50-outcome 12-word generation
+- 99-outcome 24-word generation
+- official BIP39 entropy/checksum behavior
+
+These provide an independent check against CryptoMachine-specific production behavior.
+
+## 13. Manual BIP39 tools
+
+The same core BIP39 implementation also supports:
+
+- 11 entered words -> valid possible 12th checksum words
+- 23 entered words -> valid possible 24th checksum words
+- validation of complete 12-word mnemonics
+- validation of complete 24-word mnemonics
+
+These functions do not generate entropy.
+
+## 14. Security philosophy
+
+The intended trust model is:
+
+The customer creates the entropy.
+CryptoMachine performs transparent deterministic math.
+
+The firmware should be open source and independently reviewable.
+
+Published builds should include test vectors and firmware hashes.
+
+Development builds must not be represented as production-ready for protecting funds until the firmware and hardware behavior have been adequately reviewed and tested.
