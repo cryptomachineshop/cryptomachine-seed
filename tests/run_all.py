@@ -11,6 +11,7 @@ TESTS = [
     "tests.test_mnemonic_validator",
     "tests.test_dice_sanity",
     "tests.test_dice_policy",
+    "tests.test_seed_engine",
 ]
 
 print("=" * 60)
