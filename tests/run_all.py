@@ -16,6 +16,7 @@ TEST_MODULES = [
     "tests.test_dice_session",
     "tests.test_seed_ceremony",
     "tests.test_ui_state_machine",
+    "tests.test_ui_abuse",
 ]
 
 

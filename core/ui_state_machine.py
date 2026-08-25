@@ -69,7 +69,10 @@ class UIStateMachine:
 
     def _require(self, *allowed_states):
         if self.state not in allowed_states:
-            allowed = ", ".join(state.name for state in allowed_states)
+            allowed = ", ".join(
+                state.name for state in allowed_states
+            )
+
             raise RuntimeError(
                 f"{self.state.name} cannot perform this action. "
                 f"Allowed state(s): {allowed}"
@@ -97,6 +100,7 @@ class UIStateMachine:
 
     def boot_complete(self):
         self._require(UIState.BOOT)
+
         self._clear_sensitive_session()
         self._set_state(UIState.HOME)
 
@@ -110,8 +114,10 @@ class UIStateMachine:
 
     def open_validate_phrase(self):
         self._require(UIState.HOME)
+
         self.expected_word_input = None
         self._mark_sensitive()
+
         self._set_state(UIState.VALIDATE_PHRASE_ENTRY)
 
     def open_about_security(self):
@@ -130,7 +136,9 @@ class UIStateMachine:
         self._require(UIState.DICE_WORD_COUNT)
 
         if word_count not in (12, 24):
-            raise ValueError("word_count must be 12 or 24")
+            raise ValueError(
+                "word_count must be 12 or 24"
+            )
 
         self.word_count = word_count
         self.dice_session_active = True
@@ -147,7 +155,9 @@ class UIStateMachine:
         self._require(UIState.DICE_INTRO)
 
         if not self.dice_session_active:
-            raise RuntimeError("No active dice session")
+            raise RuntimeError(
+                "No active dice session"
+            )
 
         self._mark_sensitive()
         self._set_state(UIState.DICE_ENTRY)
@@ -172,16 +182,28 @@ class UIStateMachine:
         self._require(UIState.DICE_COMPLETE)
 
         if warnings:
-            self._set_state(UIState.DICE_SANITY_WARNING)
+            self._set_state(
+                UIState.DICE_SANITY_WARNING
+            )
+
         else:
-            self._set_state(UIState.DICE_GENERATE_CONFIRM)
+            self._set_state(
+                UIState.DICE_GENERATE_CONFIRM
+            )
 
     def sanity_continue_anyway(self):
-        self._require(UIState.DICE_SANITY_WARNING)
-        self._set_state(UIState.DICE_GENERATE_CONFIRM)
+        self._require(
+            UIState.DICE_SANITY_WARNING
+        )
+
+        self._set_state(
+            UIState.DICE_GENERATE_CONFIRM
+        )
 
     def sanity_restart(self):
-        self._require(UIState.DICE_SANITY_WARNING)
+        self._require(
+            UIState.DICE_SANITY_WARNING
+        )
 
         previous_word_count = self.word_count
 
@@ -193,30 +215,48 @@ class UIStateMachine:
         self._set_state(UIState.DICE_INTRO)
 
     def generate_back(self):
-        self._require(UIState.DICE_GENERATE_CONFIRM)
+        self._require(
+            UIState.DICE_GENERATE_CONFIRM
+        )
+
         self._set_state(UIState.DICE_COMPLETE)
 
     def generate_mnemonic(self):
-        self._require(UIState.DICE_GENERATE_CONFIRM)
+        self._require(
+            UIState.DICE_GENERATE_CONFIRM
+        )
 
         if not self.dice_session_active:
-            raise RuntimeError("No active dice session")
+            raise RuntimeError(
+                "No active dice session"
+            )
 
         self.mnemonic_generated = True
         self._mark_sensitive()
 
-        self._set_state(UIState.MNEMONIC_WORD_VIEW)
+        self._set_state(
+            UIState.MNEMONIC_WORD_VIEW
+        )
 
     def mnemonic_words_complete(self):
-        self._require(UIState.MNEMONIC_WORD_VIEW)
+        self._require(
+            UIState.MNEMONIC_WORD_VIEW
+        )
 
         if not self.mnemonic_generated:
-            raise RuntimeError("Mnemonic has not been generated")
+            raise RuntimeError(
+                "Mnemonic has not been generated"
+            )
 
-        self._set_state(UIState.MNEMONIC_FULL_REVIEW)
+        self._set_state(
+            UIState.MNEMONIC_FULL_REVIEW
+        )
 
     def mnemonic_review_finish(self):
-        self._require(UIState.MNEMONIC_FULL_REVIEW)
+        self._require(
+            UIState.MNEMONIC_FULL_REVIEW
+        )
+
         self.request_destroy()
 
     # ------------------------------------------------------------
@@ -233,7 +273,9 @@ class UIStateMachine:
             self.expected_word_input = 23
 
         else:
-            raise ValueError("total_words must be 12 or 24")
+            raise ValueError(
+                "total_words must be 12 or 24"
+            )
 
         self._mark_sensitive()
         self._set_state(UIState.FINAL_WORD_ENTRY)
@@ -246,28 +288,83 @@ class UIStateMachine:
         self._require(UIState.FINAL_WORD_ENTRY)
         self._set_state(UIState.FINAL_WORD_RESULTS)
 
+    def final_word_results_back(self):
+        self._require(UIState.FINAL_WORD_RESULTS)
+
+        self._set_state(UIState.FINAL_WORD_ENTRY)
+
+    def final_word_results_home(self):
+        self._require(UIState.FINAL_WORD_RESULTS)
+
+        self._clear_sensitive_session()
+        self._set_state(UIState.HOME)
+
     # ------------------------------------------------------------
     # VALIDATION TOOL
     # ------------------------------------------------------------
 
-    def choose_validation_word_count(self, word_count):
-        self._require(UIState.VALIDATE_PHRASE_ENTRY)
+    def choose_validation_word_count(
+        self,
+        word_count,
+    ):
+        self._require(
+            UIState.VALIDATE_PHRASE_ENTRY
+        )
 
         if word_count not in (12, 24):
-            raise ValueError("word_count must be 12 or 24")
+            raise ValueError(
+                "word_count must be 12 or 24"
+            )
 
         self.expected_word_input = word_count
         self._mark_sensitive()
 
     def validation_complete(self):
-        self._require(UIState.VALIDATE_PHRASE_ENTRY)
+        self._require(
+            UIState.VALIDATE_PHRASE_ENTRY
+        )
 
-        if self.expected_word_input not in (12, 24):
+        if self.expected_word_input not in (
+            12,
+            24,
+        ):
             raise RuntimeError(
-                "Validation word count has not been selected"
+                "Validation word count has "
+                "not been selected"
             )
 
-        self._set_state(UIState.VALIDATE_PHRASE_RESULT)
+        self._set_state(
+            UIState.VALIDATE_PHRASE_RESULT
+        )
+
+    def validation_review_words(self):
+        self._require(
+            UIState.VALIDATE_PHRASE_RESULT
+        )
+
+        self._set_state(
+            UIState.VALIDATE_PHRASE_ENTRY
+        )
+
+    def validation_start_over(self):
+        self._require(
+            UIState.VALIDATE_PHRASE_RESULT
+        )
+
+        self.expected_word_input = None
+        self.sensitive_data_present = False
+
+        self._set_state(
+            UIState.VALIDATE_PHRASE_ENTRY
+        )
+
+    def validation_result_home(self):
+        self._require(
+            UIState.VALIDATE_PHRASE_RESULT
+        )
+
+        self._clear_sensitive_session()
+        self._set_state(UIState.HOME)
 
     # ------------------------------------------------------------
     # DESTRUCTION / LEAVING SENSITIVE WORKFLOWS
@@ -276,31 +373,46 @@ class UIStateMachine:
     def request_destroy(self):
         if self.state not in SENSITIVE_STATES:
             raise RuntimeError(
-                "Destroy confirmation may only be opened "
-                "from a sensitive state"
+                "Destroy confirmation may only "
+                "be opened from a sensitive state"
             )
 
-        if self.state == UIState.SESSION_DESTROY_CONFIRM:
+        if (
+            self.state
+            == UIState.SESSION_DESTROY_CONFIRM
+        ):
             raise RuntimeError(
                 "Already in destroy confirmation"
             )
 
         self._destroy_return_state = self.state
-        self._set_state(UIState.SESSION_DESTROY_CONFIRM)
+
+        self._set_state(
+            UIState.SESSION_DESTROY_CONFIRM
+        )
 
     def destroy_go_back(self):
-        self._require(UIState.SESSION_DESTROY_CONFIRM)
+        self._require(
+            UIState.SESSION_DESTROY_CONFIRM
+        )
 
         if self._destroy_return_state is None:
-            raise RuntimeError("No previous sensitive state")
+            raise RuntimeError(
+                "No previous sensitive state"
+            )
 
-        previous_state = self._destroy_return_state
+        previous_state = (
+            self._destroy_return_state
+        )
+
         self._destroy_return_state = None
 
         self._set_state(previous_state)
 
     def destroy_session(self):
-        self._require(UIState.SESSION_DESTROY_CONFIRM)
+        self._require(
+            UIState.SESSION_DESTROY_CONFIRM
+        )
 
         self._clear_sensitive_session()
         self._set_state(UIState.HOME)
@@ -308,7 +420,8 @@ class UIStateMachine:
     def leave_sensitive_workflow_to_home(self):
         if self.state not in SENSITIVE_STATES:
             raise RuntimeError(
-                "Current state is not a sensitive workflow"
+                "Current state is not a "
+                "sensitive workflow"
             )
 
         self._clear_sensitive_session()

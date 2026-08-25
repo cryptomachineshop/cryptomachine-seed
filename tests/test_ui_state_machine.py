@@ -1,4 +1,7 @@
-from core.ui_state_machine import UIState, UIStateMachine
+from core.ui_state_machine import (
+    UIState,
+    UIStateMachine,
+)
 
 
 def test_boot():
@@ -36,19 +39,37 @@ def test_dice_navigation():
     ui.shake_confirm_complete()
     assert ui.state == UIState.DICE_COMPLETE
 
-    ui.dice_complete_continue(warnings=False)
-    assert ui.state == UIState.DICE_GENERATE_CONFIRM
+    ui.dice_complete_continue(
+        warnings=False
+    )
+
+    assert (
+        ui.state
+        == UIState.DICE_GENERATE_CONFIRM
+    )
 
     ui.generate_mnemonic()
 
-    assert ui.state == UIState.MNEMONIC_WORD_VIEW
+    assert (
+        ui.state
+        == UIState.MNEMONIC_WORD_VIEW
+    )
+
     assert ui.mnemonic_generated is True
 
     ui.mnemonic_words_complete()
-    assert ui.state == UIState.MNEMONIC_FULL_REVIEW
+
+    assert (
+        ui.state
+        == UIState.MNEMONIC_FULL_REVIEW
+    )
 
     ui.mnemonic_review_finish()
-    assert ui.state == UIState.SESSION_DESTROY_CONFIRM
+
+    assert (
+        ui.state
+        == UIState.SESSION_DESTROY_CONFIRM
+    )
 
     ui.destroy_session()
 
@@ -68,7 +89,10 @@ def test_destroy_cancel_go_back():
 
     ui.request_destroy()
 
-    assert ui.state == UIState.SESSION_DESTROY_CONFIRM
+    assert (
+        ui.state
+        == UIState.SESSION_DESTROY_CONFIRM
+    )
 
     ui.destroy_go_back()
 
@@ -85,13 +109,21 @@ def test_sanity_warning_continue():
     ui.dice_entry_to_review()
     ui.shake_confirm_complete()
 
-    ui.dice_complete_continue(warnings=True)
+    ui.dice_complete_continue(
+        warnings=True
+    )
 
-    assert ui.state == UIState.DICE_SANITY_WARNING
+    assert (
+        ui.state
+        == UIState.DICE_SANITY_WARNING
+    )
 
     ui.sanity_continue_anyway()
 
-    assert ui.state == UIState.DICE_GENERATE_CONFIRM
+    assert (
+        ui.state
+        == UIState.DICE_GENERATE_CONFIRM
+    )
 
 
 def test_sanity_restart():
@@ -102,7 +134,10 @@ def test_sanity_restart():
     ui.begin_dice_entry()
     ui.dice_entry_to_review()
     ui.shake_confirm_complete()
-    ui.dice_complete_continue(warnings=True)
+
+    ui.dice_complete_continue(
+        warnings=True
+    )
 
     ui.sanity_restart()
 
@@ -118,6 +153,7 @@ def test_final_word_flow():
     ui.boot_complete()
 
     ui.open_final_word_tool()
+
     assert ui.state == UIState.FINAL_WORD_MODE
 
     ui.choose_final_word_mode(24)
@@ -127,10 +163,20 @@ def test_final_word_flow():
     assert ui.sensitive_data_present is True
 
     ui.final_word_entry_complete()
-    assert ui.state == UIState.FINAL_WORD_RESULTS
 
-    ui.request_destroy()
-    ui.destroy_session()
+    assert (
+        ui.state
+        == UIState.FINAL_WORD_RESULTS
+    )
+
+    ui.final_word_results_back()
+
+    assert ui.state == UIState.FINAL_WORD_ENTRY
+    assert ui.expected_word_input == 23
+    assert ui.sensitive_data_present is True
+
+    ui.final_word_entry_complete()
+    ui.final_word_results_home()
 
     assert ui.state == UIState.HOME
     assert ui.expected_word_input is None
@@ -143,17 +189,47 @@ def test_validation_flow():
 
     ui.open_validate_phrase()
 
-    assert ui.state == UIState.VALIDATE_PHRASE_ENTRY
+    assert (
+        ui.state
+        == UIState.VALIDATE_PHRASE_ENTRY
+    )
+
     assert ui.sensitive_data_present is True
 
     ui.choose_validation_word_count(12)
+
     assert ui.expected_word_input == 12
 
     ui.validation_complete()
 
-    assert ui.state == UIState.VALIDATE_PHRASE_RESULT
+    assert (
+        ui.state
+        == UIState.VALIDATE_PHRASE_RESULT
+    )
 
-    ui.leave_sensitive_workflow_to_home()
+    ui.validation_review_words()
+
+    assert (
+        ui.state
+        == UIState.VALIDATE_PHRASE_ENTRY
+    )
+
+    assert ui.expected_word_input == 12
+
+    ui.validation_complete()
+    ui.validation_start_over()
+
+    assert (
+        ui.state
+        == UIState.VALIDATE_PHRASE_ENTRY
+    )
+
+    assert ui.expected_word_input is None
+    assert ui.sensitive_data_present is False
+
+    ui.choose_validation_word_count(24)
+    ui.validation_complete()
+    ui.validation_result_home()
 
     assert ui.state == UIState.HOME
     assert ui.expected_word_input is None
@@ -172,7 +248,8 @@ def test_invalid_transition_rejected():
 
     else:
         raise AssertionError(
-            "Invalid generation transition was not rejected"
+            "Invalid generation transition "
+            "was not rejected"
         )
 
 
@@ -189,7 +266,8 @@ def test_invalid_word_counts_rejected():
 
     else:
         raise AssertionError(
-            "Invalid dice word count was not rejected"
+            "Invalid dice word count "
+            "was not rejected"
         )
 
 
