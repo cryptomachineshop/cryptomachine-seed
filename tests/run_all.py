@@ -2,7 +2,7 @@ import subprocess
 import sys
 
 
-TESTS = [
+TEST_MODULES = [
     "tests.test_dice_hash",
     "tests.test_bip39_12",
     "tests.test_bip39_24",
@@ -15,32 +15,31 @@ TESTS = [
     "tests.test_word_search",
     "tests.test_dice_session",
     "tests.test_seed_ceremony",
+    "tests.test_ui_state_machine",
 ]
 
 
-print("=" * 60)
-print("CryptoMachine Seed Generator - Core Test Suite")
-print("=" * 60)
-print()
+def main():
+    for module in TEST_MODULES:
+        print()
+        print("=" * 60)
+        print(f"RUNNING: {module}")
+        print("=" * 60)
 
+        result = subprocess.run(
+            [sys.executable, "-m", module]
+        )
 
-for test in TESTS:
-    print(f"Running {test}...")
-    print("-" * 60)
-
-    result = subprocess.run(
-        [sys.executable, "-m", test]
-    )
+        if result.returncode != 0:
+            print()
+            print(f"FAIL: {module}")
+            sys.exit(result.returncode)
 
     print()
-
-    if result.returncode != 0:
-        print("=" * 60)
-        print(f"FAIL: {test}")
-        print("=" * 60)
-        raise SystemExit(result.returncode)
+    print("=" * 60)
+    print("PASS: ALL CRYPTOMACHINE CORE TESTS PASSED")
+    print("=" * 60)
 
 
-print("=" * 60)
-print("PASS: ALL CRYPTOMACHINE CORE TESTS PASSED")
-print("=" * 60)
+if __name__ == "__main__":
+    main()
