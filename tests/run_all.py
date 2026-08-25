@@ -12,7 +12,9 @@ TESTS = [
     "tests.test_dice_sanity",
     "tests.test_dice_policy",
     "tests.test_seed_engine",
+    "tests.test_word_search",
 ]
+
 
 print("=" * 60)
 print("CryptoMachine Seed Generator - Core Test Suite")
