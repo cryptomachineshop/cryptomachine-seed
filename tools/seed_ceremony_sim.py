@@ -1,4 +1,4 @@
-from core.dice_sanity import analyze_dice
+from core.dice_sanity import analyze_five_dice
 from core.seed_ceremony import SeedCeremony
 from core.reference_engine import load_wordlist
 
@@ -7,52 +7,127 @@ def show_shakes(ceremony):
     shakes = ceremony.session.get_shakes()
 
     print()
-    print("CONFIRMED SHAKES")
-    print("-" * 40)
+    print("=" * 50)
+    print("RECORDED SHAKES")
+    print("=" * 50)
 
     if not shakes:
-        print("None")
-    else:
-        for number, shake in enumerate(shakes, start=1):
-            print(
-                f"{number:02d}: "
-                + " ".join(shake)
-            )
+        print()
+        print("No confirmed shakes yet.")
+        return
 
     print()
+
+    for index, shake in enumerate(shakes, start=1):
+        print(
+            f"{index:02d}. "
+            f"D1={shake[0]} "
+            f"D2={shake[1]} "
+            f"D3={shake[2]} "
+            f"D4={shake[3]} "
+            f"D5={shake[4]}"
+        )
+
+
+def show_sanity_report(sanity):
+    aggregate = sanity["aggregate"]
+
+    print()
+    print("=" * 50)
+    print("DICE SANITY CHECK")
+    print("=" * 50)
+    print()
+
+    print("Combined face counts:")
+    print(aggregate["counts"])
+    print()
+
+    print(
+        "Longest combined repeated-face run:",
+        aggregate["longest_run"],
+    )
+
+    print()
+    print("Per-die counts:")
+    print()
+
+    for die_name in (
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+    ):
+        die = sanity["per_die"][die_name]
+
+        print(
+            f"{die_name}: "
+            f"{die['counts']} "
+            f"(longest run: {die['longest_run']})"
+        )
+
+    print()
+
+    if sanity["warnings"]:
+        print("=" * 50)
+        print("WARNING")
+        print("=" * 50)
+        print()
+
+        for warning in sanity["warnings"]:
+            print(f"- {warning}")
+
+        print()
+        print(
+            "These checks can identify obvious patterns, "
+            "but they cannot prove that your dice are fair "
+            "or that the recorded outcomes are random."
+        )
+
+    else:
+        print("No gross dice patterns were detected.")
+        print()
+        print(
+            "This does NOT prove that the dice are fair "
+            "or that the outcomes are random."
+        )
 
 
 def show_words(mnemonic):
     words = mnemonic.split()
     wordlist = load_wordlist()
 
-    indexes = {
-        word: index + 1
-        for index, word in enumerate(wordlist)
-    }
-
     print()
     print("=" * 50)
-    print("TEST MNEMONIC")
+    print("RECORD YOUR BIP39 MNEMONIC")
     print("=" * 50)
-    print()
 
     for position, word in enumerate(words, start=1):
-        print(
-            f"WORD {position:02d} / {len(words)}"
-        )
-
-        print(
-            f"{word.upper()}   "
-            f"(BIP39 #{indexes[word]:04d})"
-        )
-
-        if position != len(words):
-            input("Press Enter for next word...")
+        bip39_number = wordlist.index(word) + 1
 
         print()
+        print("-" * 50)
+        print(
+            f"WORD {position} OF {len(words)}"
+        )
+        print()
+        print(word.upper())
+        print()
+        print(
+            f"BIP39 #{bip39_number:04d}"
+        )
+        print("-" * 50)
 
-    print("=" * 50)
+        if position < len(words):
+            input(
+                "Press Enter for NEXT word..."
+            )
+
+    print()
+    input(
+        "Press Enter to review the complete "
+        "word list..."
+    )
 
 
 def show_final_review(mnemonic):
@@ -71,85 +146,91 @@ def show_final_review(mnemonic):
 
     print()
     print("=" * 50)
-    print()
 
 
-def choose_word_count():
-    while True:
+def run_ceremony(word_count=None):
+    if word_count is None:
         print()
-        print("CREATE TEST SEED")
+        print("=" * 50)
+        print("CREATE FROM PHYSICAL DICE")
+        print("=" * 50)
         print()
         print("1. 12 words")
         print("2. 24 words")
-        print("Q. Quit")
         print()
 
-        choice = input("> ").strip().lower()
+        choice = input("> ").strip()
 
         if choice == "1":
-            return 12
+            word_count = 12
 
-        if choice == "2":
-            return 24
+        elif choice == "2":
+            word_count = 24
 
-        if choice == "q":
-            return None
+        else:
+            print("Invalid selection.")
+            return
 
-        print("Invalid selection.")
+    if word_count not in (12, 24):
+        raise ValueError(
+            "word_count must be 12 or 24"
+        )
 
-
-def run_ceremony(word_count):
     ceremony = SeedCeremony(word_count)
 
     print()
     print("=" * 50)
     print(
-        f"{word_count}-WORD TEST CEREMONY"
+        f"{word_count}-WORD DICE CEREMONY"
     )
     print("=" * 50)
     print()
-
+    print("Use five physical D6 dice.")
+    print()
     print(
-        f"Requires {ceremony.total_shakes} shakes "
-        f"of five dice."
+        "Enter each shake as five digits "
+        "in fixed D1-D5 order."
     )
-
     print()
-    print("Enter each shake as five digits.")
-    print("Example: 62415")
+    print("Example:")
+    print("62415")
     print()
-
+    print(
+        f"Required shakes: "
+        f"{ceremony.session.total_shakes}"
+    )
+    print()
     print("Commands:")
-    print("  U = undo last confirmed shake")
-    print("  R = review confirmed shakes")
-    print("  Q = destroy and quit")
+    print("U = undo last confirmed shake")
+    print("R = review confirmed shakes")
+    print("Q = cancel and destroy session")
     print()
 
-    while not ceremony.complete:
-        next_shake = ceremony.shake_count + 1
-
-        print(
-            f"SHAKE {next_shake} / "
-            f"{ceremony.total_shakes}"
+    while not ceremony.session.complete:
+        shake_number = (
+            ceremony.session.shake_count + 1
         )
 
+        total = ceremony.session.total_shakes
+
         entry = input(
-            "D1 D2 D3 D4 D5 > "
+            f"Shake {shake_number}/{total} "
+            "[D1D2D3D4D5]: "
         ).strip().lower()
 
         if entry == "u":
-            try:
-                removed = ceremony.undo_last_shake()
+            removed = (
+                ceremony.session.undo_last_shake()
+            )
 
+            if removed is None:
+                print("Nothing to undo.")
+            else:
                 print(
                     "Removed:",
-                    " ".join(removed),
+                    "".join(removed),
                 )
 
-            except ValueError as exc:
-                print(exc)
-
-            print()
             continue
 
         if entry == "r":
@@ -160,154 +241,148 @@ def run_ceremony(word_count):
             ceremony.destroy_session()
 
             print()
-            print("TEST SESSION DESTROYED")
-
+            print("Test session destroyed.")
             return
 
-        entry = entry.replace(" ", "")
-
-        if len(entry) != 5:
-            print(
-                "Enter exactly five values "
-                "from 1 through 6."
+        if (
+            len(entry) != 5
+            or any(
+                face not in "123456"
+                for face in entry
             )
-
-            print()
+        ):
+            print(
+                "Enter exactly five digits, "
+                "using only 1 through 6."
+            )
             continue
 
-        try:
-            ceremony.add_shake(entry)
-
-        except ValueError as exc:
-            print(exc)
-            print()
-            continue
-
-        print(
-            f"Shake {ceremony.shake_count} saved."
-        )
-
         print()
-
-    dice = ceremony.session.canonical_dice_string()
-    sanity = analyze_dice(dice)
-
-    print()
-    print("=" * 50)
-    print("PHYSICAL ENTROPY INPUT COMPLETE")
-    print("=" * 50)
-    print()
-
-    print(
-        f"Outcomes collected: {len(dice)}"
-    )
-
-    print(
-        "Face counts:",
-        sanity["counts"],
-    )
-
-    print(
-        "Longest identical run:",
-        sanity["longest_run"],
-    )
-
-    print()
-
-    if sanity["warnings"]:
-        print("WARNINGS:")
-
-        for warning in sanity["warnings"]:
-            print(" -", warning)
-
+        print("Review this shake:")
         print()
-
-        print(
-            "These warnings do not prove that "
-            "the entropy is unsafe."
-        )
-
+        print(f"D1: {entry[0]}")
+        print(f"D2: {entry[1]}")
+        print(f"D3: {entry[2]}")
+        print(f"D4: {entry[3]}")
+        print(f"D5: {entry[4]}")
         print()
 
         confirm = input(
-            "Type CONTINUE to generate anyway: "
-        ).strip()
+            "Confirm shake? [Y/N]: "
+        ).strip().lower()
 
-        if confirm != "CONTINUE":
-            ceremony.destroy_session()
+        if confirm != "y":
+            print("Shake not recorded.")
+            continue
 
-            print()
-            print("TEST SESSION DESTROYED")
+        ceremony.add_shake(list(entry))
 
-            return
+    print()
+    print("=" * 50)
+    print("DICE ENTRY COMPLETE")
+    print("=" * 50)
+    print()
+    print(
+        f"{ceremony.session.shake_count} "
+        "shakes recorded."
+    )
+    print(
+        f"{len("".join("".join(shake) for shake in ceremony.session.get_shakes()))} "
+        "outcomes recorded."
+    )
+    print()
+    print(
+        "The mnemonic has NOT been generated yet."
+    )
 
-    else:
-        print(
-            "No obvious input-pattern warnings detected."
-        )
+    canonical = "".join("".join(shake) for shake in ceremony.session.get_shakes())
+    sanity = analyze_five_dice(canonical)
 
-        print(
-            "This does not prove the dice are perfectly fair."
-        )
+    show_sanity_report(sanity)
 
+    if sanity["warnings"]:
+        print()
+        print("Options:")
+        print()
+        print("C = continue anyway")
+        print("R = review recorded shakes")
+        print("X = restart ceremony")
+        print("Q = cancel and destroy")
         print()
 
-    choice = input(
-        "Generate test mnemonic? (Y/N): "
+        while True:
+            choice = input("> ").strip().lower()
+
+            if choice == "r":
+                show_shakes(ceremony)
+                continue
+
+            if choice == "x":
+                ceremony.destroy_session()
+                print()
+                print("Restarting ceremony...")
+                return run_ceremony(word_count)
+
+            if choice == "q":
+                ceremony.destroy_session()
+                print()
+                print("Test session destroyed.")
+                return
+
+            if choice == "c":
+                break
+
+            print("Invalid selection.")
+
+    print()
+    print("=" * 50)
+    print("READY TO GENERATE")
+    print("=" * 50)
+    print()
+    print(
+        "The recorded physical dice results "
+        "will now be converted into a "
+        "standard BIP39 mnemonic."
+    )
+    print()
+    print("No hidden salt.")
+    print("No timestamp.")
+    print("No device-generated randomness.")
+    print()
+
+    confirm = input(
+        "Generate mnemonic? [Y/N]: "
     ).strip().lower()
 
-    if choice != "y":
+    if confirm != "y":
         ceremony.destroy_session()
 
         print()
-        print("TEST SESSION DESTROYED")
-
+        print("Generation cancelled.")
+        print("Test session destroyed.")
         return
 
     result = ceremony.generate()
 
     show_words(result["mnemonic"])
-
-    input(
-        "Press Enter to review the complete word list..."
-    )
-
     show_final_review(result["mnemonic"])
 
+    print()
     input(
-        "Press Enter to destroy this test session..."
+        "Press Enter to destroy this "
+        "test session..."
     )
 
     ceremony.destroy_session()
 
     print()
-    print("TEST SESSION DESTROYED")
-    print()
+    print("Session destroyed.")
 
 
 def main():
-    print()
-    print("=" * 50)
-    print("CRYPTOMACHINE SEED GENERATOR")
-    print("PC DEVELOPMENT SIMULATOR")
-    print("=" * 50)
-    print()
-
-    print("TEST USE ONLY")
-    print()
-
-    print(
-        "Do not use this Windows development simulator "
-        "to create a seed that will protect real funds."
-    )
-
-    word_count = choose_word_count()
-
-    if word_count is None:
-        return
-
-    run_ceremony(word_count)
+    run_ceremony()
 
 
 if __name__ == "__main__":
     main()
+
