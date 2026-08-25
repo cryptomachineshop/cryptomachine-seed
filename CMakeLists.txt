@@ -14,6 +14,8 @@ add_library(
     cryptomachine_core
     firmware/core/dice_policy.cpp
     firmware/core/sha256.cpp
+    firmware/core/bip39.cpp
+    firmware/core/dice_entropy.cpp
 )
 
 target_include_directories(
@@ -44,6 +46,51 @@ target_link_libraries(
         cryptomachine_core
 )
 
+add_executable(
+    test_cpp_bip39
+    firmware/host_tests/test_bip39.cpp
+)
+
+target_link_libraries(
+    test_cpp_bip39
+    PRIVATE
+        cryptomachine_core
+)
+
+target_compile_definitions(
+    test_cpp_bip39
+    PRIVATE
+        CRYPTOMACHINE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
+add_executable(
+    test_cpp_dice_entropy
+    firmware/host_tests/test_dice_entropy.cpp
+)
+
+add_executable(
+    test_cpp_seed_pipeline
+    firmware/host_tests/test_seed_pipeline.cpp
+)
+
+target_link_libraries(
+    test_cpp_seed_pipeline
+    PRIVATE
+        cryptomachine_core
+)
+
+target_compile_definitions(
+    test_cpp_seed_pipeline
+    PRIVATE
+        CRYPTOMACHINE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
+target_link_libraries(
+    test_cpp_dice_entropy
+    PRIVATE
+        cryptomachine_core
+)
+
 enable_testing()
 
 add_test(
@@ -54,4 +101,19 @@ add_test(
 add_test(
     NAME cpp_sha256
     COMMAND test_cpp_sha256
+)
+
+add_test(
+    NAME cpp_bip39
+    COMMAND test_cpp_bip39
+)
+
+add_test(
+    NAME cpp_dice_entropy
+    COMMAND test_cpp_dice_entropy
+)
+
+add_test(
+    NAME cpp_seed_pipeline
+    COMMAND test_cpp_seed_pipeline
 )
