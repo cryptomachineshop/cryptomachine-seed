@@ -13,6 +13,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_library(
     cryptomachine_core
     firmware/core/dice_policy.cpp
+    firmware/core/sha256.cpp
 )
 
 target_include_directories(
@@ -32,9 +33,25 @@ target_link_libraries(
         cryptomachine_core
 )
 
+add_executable(
+    test_cpp_sha256
+    firmware/host_tests/test_sha256.cpp
+)
+
+target_link_libraries(
+    test_cpp_sha256
+    PRIVATE
+        cryptomachine_core
+)
+
 enable_testing()
 
 add_test(
     NAME cpp_dice_policy
     COMMAND test_cpp_dice_policy
+)
+
+add_test(
+    NAME cpp_sha256
+    COMMAND test_cpp_sha256
 )
