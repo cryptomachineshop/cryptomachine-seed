@@ -13,6 +13,8 @@ TESTS = [
     "tests.test_dice_policy",
     "tests.test_seed_engine",
     "tests.test_word_search",
+    "tests.test_dice_session",
+    "tests.test_seed_ceremony",
 ]
 
 
