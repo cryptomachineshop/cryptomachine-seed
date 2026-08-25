@@ -25,6 +25,7 @@ def show_shakes(ceremony):
 def show_words(mnemonic):
     words = mnemonic.split()
     wordlist = load_wordlist()
+
     indexes = {
         word: index + 1
         for index, word in enumerate(wordlist)
@@ -40,6 +41,7 @@ def show_words(mnemonic):
         print(
             f"WORD {position:02d} / {len(words)}"
         )
+
         print(
             f"{word.upper()}   "
             f"(BIP39 #{indexes[word]:04d})"
@@ -51,6 +53,25 @@ def show_words(mnemonic):
         print()
 
     print("=" * 50)
+
+
+def show_final_review(mnemonic):
+    words = mnemonic.split()
+
+    print()
+    print("=" * 50)
+    print("FINAL MNEMONIC REVIEW")
+    print("=" * 50)
+    print()
+
+    for position, word in enumerate(words, start=1):
+        print(
+            f"{position:02d}. {word.upper()}"
+        )
+
+    print()
+    print("=" * 50)
+    print()
 
 
 def choose_word_count():
@@ -87,14 +108,17 @@ def run_ceremony(word_count):
     )
     print("=" * 50)
     print()
+
     print(
         f"Requires {ceremony.total_shakes} shakes "
         f"of five dice."
     )
+
     print()
     print("Enter each shake as five digits.")
     print("Example: 62415")
     print()
+
     print("Commands:")
     print("  U = undo last confirmed shake")
     print("  R = review confirmed shakes")
@@ -116,10 +140,12 @@ def run_ceremony(word_count):
         if entry == "u":
             try:
                 removed = ceremony.undo_last_shake()
+
                 print(
                     "Removed:",
                     " ".join(removed),
                 )
+
             except ValueError as exc:
                 print(exc)
 
@@ -132,8 +158,10 @@ def run_ceremony(word_count):
 
         if entry == "q":
             ceremony.destroy_session()
+
             print()
             print("TEST SESSION DESTROYED")
+
             return
 
         entry = entry.replace(" ", "")
@@ -143,11 +171,13 @@ def run_ceremony(word_count):
                 "Enter exactly five values "
                 "from 1 through 6."
             )
+
             print()
             continue
 
         try:
             ceremony.add_shake(entry)
+
         except ValueError as exc:
             print(exc)
             print()
@@ -156,6 +186,7 @@ def run_ceremony(word_count):
         print(
             f"Shake {ceremony.shake_count} saved."
         )
+
         print()
 
     dice = ceremony.session.canonical_dice_string()
@@ -166,29 +197,36 @@ def run_ceremony(word_count):
     print("PHYSICAL ENTROPY INPUT COMPLETE")
     print("=" * 50)
     print()
+
     print(
         f"Outcomes collected: {len(dice)}"
     )
+
     print(
         "Face counts:",
         sanity["counts"],
     )
+
     print(
         "Longest identical run:",
         sanity["longest_run"],
     )
+
     print()
 
     if sanity["warnings"]:
         print("WARNINGS:")
+
         for warning in sanity["warnings"]:
             print(" -", warning)
 
         print()
+
         print(
             "These warnings do not prove that "
             "the entropy is unsafe."
         )
+
         print()
 
         confirm = input(
@@ -197,17 +235,21 @@ def run_ceremony(word_count):
 
         if confirm != "CONTINUE":
             ceremony.destroy_session()
+
             print()
             print("TEST SESSION DESTROYED")
+
             return
 
     else:
         print(
             "No obvious input-pattern warnings detected."
         )
+
         print(
             "This does not prove the dice are perfectly fair."
         )
+
         print()
 
     choice = input(
@@ -216,13 +258,21 @@ def run_ceremony(word_count):
 
     if choice != "y":
         ceremony.destroy_session()
+
         print()
         print("TEST SESSION DESTROYED")
+
         return
 
     result = ceremony.generate()
 
     show_words(result["mnemonic"])
+
+    input(
+        "Press Enter to review the complete word list..."
+    )
+
+    show_final_review(result["mnemonic"])
 
     input(
         "Press Enter to destroy this test session..."
@@ -242,8 +292,10 @@ def main():
     print("PC DEVELOPMENT SIMULATOR")
     print("=" * 50)
     print()
+
     print("TEST USE ONLY")
     print()
+
     print(
         "Do not use this Windows development simulator "
         "to create a seed that will protect real funds."
