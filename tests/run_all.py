@@ -10,6 +10,7 @@ TESTS = [
     "tests.test_checksum_words",
     "tests.test_mnemonic_validator",
     "tests.test_dice_sanity",
+    "tests.test_dice_policy",
 ]
 
 print("=" * 60)
