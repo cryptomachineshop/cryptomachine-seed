@@ -38,4 +38,13 @@ SeedEngineStatus create_seed_from_dice(
     SeedResult& result
 );
 
+// Explicitly wipe sensitive data held by a completed or
+// partially completed seed result.
+//
+// Intended for success, cancel, timeout, reset, and session
+// teardown paths.
+void destroy_seed_result(
+    SeedResult& result
+);
+
 }  // namespace cryptomachine

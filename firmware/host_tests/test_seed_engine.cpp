@@ -6,6 +6,96 @@
 #include <string>
 #include <string_view>
 
+void test_destroy_seed_result() {
+    constexpr std::string_view dice =
+        "61234"
+        "62345"
+        "63456"
+        "64561"
+        "65612"
+        "66123"
+        "61234"
+        "62345"
+        "63456"
+        "64561";
+
+    cryptomachine::SeedResult result;
+
+    const auto status =
+        cryptomachine::create_seed_from_dice(
+            dice,
+            12,
+            result
+        );
+
+    check(
+        status == cryptomachine::SeedEngineStatus::Success,
+        "destroy test seed generation must succeed"
+    );
+
+    check(
+        result.mnemonic.word_count == 12,
+        "destroy test must begin with mnemonic data"
+    );
+
+    check(
+        !result.sanity.per_die[0].sequence.empty(),
+        "destroy test must begin with stored dice sequence"
+    );
+
+    check(
+        result.sanity.warning_count != 0,
+        "destroy test must begin with sanity warning data"
+    );
+
+    cryptomachine::destroy_seed_result(result);
+
+    check(
+        result.mnemonic.word_count == 0,
+        "destroy must clear mnemonic word count"
+    );
+
+    for (
+        const std::uint16_t index :
+        result.mnemonic.word_indices
+    ) {
+        check(
+            index == 0,
+            "destroy must clear every mnemonic index"
+        );
+    }
+
+    check(
+        result.sanity.rolls_per_die == 0,
+        "destroy must clear rolls-per-die metadata"
+    );
+
+    check(
+        result.sanity.warning_count == 0,
+        "destroy must clear combined warning count"
+    );
+
+    check(
+        result.sanity.aggregate.total == 0,
+        "destroy must clear aggregate total"
+    );
+
+    for (
+        const auto& die :
+        result.sanity.per_die
+    ) {
+        check(
+            die.sequence.empty(),
+            "destroy must clear per-die sequence"
+        );
+
+        check(
+            die.warning_count == 0,
+            "destroy must clear per-die warning count"
+        );
+    }
+}
+
 namespace {
 
 int failures = 0;
@@ -252,6 +342,8 @@ int main() {
     test_per_die_warning_reaches_seed_engine();
     test_49_outcomes_rejected();
     test_99_outcomes_rejected();
+    test_unsupported_word_count_rejected();
+    test_destroy_seed_result();	
     test_unsupported_word_count_rejected();
 
     if (failures != 0) {
