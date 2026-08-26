@@ -2,6 +2,7 @@
 
 #include "dice_entropy.h"
 #include "dice_policy.h"
+#include "secure_zero.h"
 
 #include <cstdint>
 #include <span>
@@ -44,7 +45,15 @@ SeedEngineStatus create_seed_from_dice(
             word_count,
             entropy
         )) {
+        secure_zero(
+            entropy.bytes.data(),
+            entropy.bytes.size()
+        );
+
+        entropy.size = 0;
+
         result = {};
+
         return SeedEngineStatus::EntropyGenerationFailed;
     }
 
@@ -53,10 +62,23 @@ SeedEngineStatus create_seed_from_dice(
         entropy.size
     );
 
-    if (!bip39_entropy_to_mnemonic(
+    const bool bip39_ok =
+        bip39_entropy_to_mnemonic(
             entropy_span,
             result.mnemonic
-        )) {
+        );
+
+    // The derived entropy is no longer needed after BIP39
+    // indexes have been produced. Explicitly overwrite the
+    // entire backing buffer before returning.
+    secure_zero(
+        entropy.bytes.data(),
+        entropy.bytes.size()
+    );
+
+    entropy.size = 0;
+
+    if (!bip39_ok) {
         result = {};
         return SeedEngineStatus::Bip39GenerationFailed;
     }

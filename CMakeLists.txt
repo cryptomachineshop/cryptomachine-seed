@@ -19,6 +19,7 @@ add_library(
     firmware/core/bip39_wordlist.cpp
     firmware/core/dice_sanity.cpp
     firmware/core/seed_engine.cpp
+    firmware/core/secure_zero.cpp
 )
 
 target_include_directories(
@@ -106,6 +107,17 @@ target_link_libraries(
         cryptomachine_core
 )
 
+add_executable(
+    test_cpp_secure_zero
+    firmware/host_tests/test_secure_zero.cpp
+)
+
+target_link_libraries(
+    test_cpp_secure_zero
+    PRIVATE
+        cryptomachine_core
+)
+
 enable_testing()
 
 add_test(
@@ -141,4 +153,9 @@ add_test(
 add_test(
     NAME cpp_seed_engine
     COMMAND test_cpp_seed_engine
+)
+
+add_test(
+    NAME cpp_secure_zero
+    COMMAND test_cpp_secure_zero
 )

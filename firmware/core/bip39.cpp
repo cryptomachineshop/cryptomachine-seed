@@ -1,5 +1,6 @@
 #include "bip39.h"
 
+#include "secure_zero.h"
 #include "sha256.h"
 
 namespace cryptomachine {
@@ -51,7 +52,7 @@ bool bip39_entropy_to_mnemonic(
     const std::size_t total_bits = entropy_bits + checksum_bits;
     const std::size_t word_count = total_bits / 11;
 
-    const Sha256Digest hash = sha256(entropy);
+    Sha256Digest hash = sha256(entropy);
 
     for (std::size_t word = 0; word < word_count; ++word) {
         std::uint16_t index = 0;
@@ -79,6 +80,12 @@ bool bip39_entropy_to_mnemonic(
     }
 
     mnemonic.word_count = word_count;
+
+    secure_zero(
+        hash.data(),
+        hash.size()
+    );
+
     return true;
 }
 
@@ -90,8 +97,10 @@ std::string bip39_mnemonic_to_string(
         return {};
     }
 
-    if (mnemonic.word_count == 0 ||
-        mnemonic.word_count > kBip39MaxWords) {
+    if (
+        mnemonic.word_count == 0 ||
+        mnemonic.word_count > kBip39MaxWords
+    ) {
         return {};
     }
 
