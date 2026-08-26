@@ -32,3 +32,5 @@ __pycache__/
 *.pyd
 
 build-host/
+
+build-rp2350/
