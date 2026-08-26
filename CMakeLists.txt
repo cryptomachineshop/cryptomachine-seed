@@ -21,6 +21,7 @@ add_library(
     firmware/core/seed_engine.cpp
     firmware/core/secure_zero.cpp
     firmware/core/dice_session.cpp
+    firmware/core/seed_ceremony.cpp
 )
 
 target_include_directories(
@@ -130,6 +131,17 @@ target_link_libraries(
         cryptomachine_core
 )
 
+add_executable(
+    test_cpp_seed_ceremony
+    firmware/host_tests/test_seed_ceremony.cpp
+)
+
+target_link_libraries(
+    test_cpp_seed_ceremony
+    PRIVATE
+        cryptomachine_core
+)
+
 enable_testing()
 
 add_test(
@@ -175,4 +187,9 @@ add_test(
 add_test(
     NAME cpp_dice_session
     COMMAND test_cpp_dice_session
+)
+
+add_test(
+    NAME cpp_seed_ceremony
+    COMMAND test_cpp_seed_ceremony
 )
