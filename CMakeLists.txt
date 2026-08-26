@@ -18,6 +18,7 @@ add_library(
     firmware/core/dice_entropy.cpp
     firmware/core/bip39_wordlist.cpp
     firmware/core/dice_sanity.cpp
+    firmware/core/seed_engine.cpp
 )
 
 target_include_directories(
@@ -94,6 +95,17 @@ target_link_libraries(
         cryptomachine_core
 )
 
+add_executable(
+    test_cpp_seed_engine
+    firmware/host_tests/test_seed_engine.cpp
+)
+
+target_link_libraries(
+    test_cpp_seed_engine
+    PRIVATE
+        cryptomachine_core
+)
+
 enable_testing()
 
 add_test(
@@ -124,4 +136,9 @@ add_test(
 add_test(
     NAME cpp_dice_sanity
     COMMAND test_cpp_dice_sanity
+)
+
+add_test(
+    NAME cpp_seed_engine
+    COMMAND test_cpp_seed_engine
 )
