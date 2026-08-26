@@ -22,6 +22,7 @@ add_library(
     firmware/core/secure_zero.cpp
     firmware/core/dice_session.cpp
     firmware/core/seed_ceremony.cpp
+    firmware/core/ui_state_machine.cpp
 )
 
 target_include_directories(
@@ -142,6 +143,28 @@ target_link_libraries(
         cryptomachine_core
 )
 
+add_executable(
+    test_cpp_ui_state_machine
+    firmware/host_tests/test_ui_state_machine.cpp
+)
+
+target_link_libraries(
+    test_cpp_ui_state_machine
+    PRIVATE
+        cryptomachine_core
+)
+
+add_executable(
+    test_cpp_ui_abuse
+    firmware/host_tests/test_ui_abuse.cpp
+)
+
+target_link_libraries(
+    test_cpp_ui_abuse
+    PRIVATE
+        cryptomachine_core
+)
+
 enable_testing()
 
 add_test(
@@ -192,4 +215,14 @@ add_test(
 add_test(
     NAME cpp_seed_ceremony
     COMMAND test_cpp_seed_ceremony
+)
+
+add_test(
+    NAME cpp_ui_state_machine
+    COMMAND test_cpp_ui_state_machine
+)
+
+add_test(
+    NAME cpp_ui_abuse
+    COMMAND test_cpp_ui_abuse
 )
