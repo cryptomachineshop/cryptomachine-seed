@@ -6,30 +6,17 @@
 
 #include <cstdint>
 #include <span>
-#include <string>
 
 namespace cryptomachine {
-namespace {
-
-void wipe_string(std::string& value) {
-    if (!value.empty()) {
-        secure_zero(
-            value.data(),
-            value.size()
-        );
-    }
-
-    value.clear();
-}
-
-}  // namespace
 
 SeedEngineStatus create_seed_from_dice(
     std::string_view dice,
     std::size_t word_count,
     SeedResult& result
 ) {
-    result = {};
+    // Securely clear anything the caller may have left
+    // in the result from an earlier generation.
+    destroy_seed_result(result);
 
     if (
         word_count != kWordCount12 &&
@@ -49,11 +36,12 @@ SeedEngineStatus create_seed_from_dice(
             dice,
             result.sanity
         )) {
-        result = {};
+        destroy_seed_result(result);
+
         return SeedEngineStatus::SanityAnalysisFailed;
     }
 
-    DiceEntropy entropy;
+    DiceEntropy entropy{};
 
     if (!dice_to_entropy(
             dice,
@@ -67,7 +55,7 @@ SeedEngineStatus create_seed_from_dice(
 
         entropy.size = 0;
 
-        result = {};
+        destroy_seed_result(result);
 
         return SeedEngineStatus::EntropyGenerationFailed;
     }
@@ -102,7 +90,6 @@ SeedEngineStatus create_seed_from_dice(
 void destroy_seed_result(
     SeedResult& result
 ) {
-    // Wipe BIP39 word indexes.
     secure_zero(
         result.mnemonic.word_indices.data(),
         result.mnemonic.word_indices.size() *
@@ -111,31 +98,10 @@ void destroy_seed_result(
 
     result.mnemonic.word_count = 0;
 
-    // Aggregate warnings.
-    for (std::string& warning :
-         result.sanity.aggregate.warnings) {
-        wipe_string(warning);
-    }
+    destroy_five_dice_sanity(
+        result.sanity
+    );
 
-    // Per-die sequences and warnings.
-    for (PerDieSanity& die :
-         result.sanity.per_die) {
-        wipe_string(die.sequence);
-
-        for (std::string& warning :
-             die.warnings) {
-            wipe_string(warning);
-        }
-    }
-
-    // Combined warning copies.
-    for (std::string& warning :
-         result.sanity.warnings) {
-        wipe_string(warning);
-    }
-
-    // Once dynamically stored strings have been overwritten,
-    // reset all remaining counters, counts, indexes, and metadata.
     result = {};
 }
 

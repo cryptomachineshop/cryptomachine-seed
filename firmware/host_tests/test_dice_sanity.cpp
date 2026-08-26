@@ -271,6 +271,118 @@ void test_per_die_long_run_detected() {
     );
 }
 
+void test_destroy_five_dice_sanity() {
+    const std::string dice =
+        "61234"
+        "62345"
+        "63456"
+        "64561"
+        "65612"
+        "66123"
+        "61234"
+        "62345"
+        "63456"
+        "64561";
+
+    cryptomachine::FiveDiceSanity result;
+
+    check(
+        cryptomachine::analyze_five_dice(
+            dice,
+            result
+        ),
+        "destruction test input must be accepted"
+    );
+
+    check(
+        result.rolls_per_die != 0,
+        "destruction test must begin with roll data"
+    );
+
+    check(
+        !result.per_die[0].sequence.empty(),
+        "destruction test must begin with per-die sequence"
+    );
+
+    check(
+        result.warning_count != 0,
+        "destruction test must begin with warnings"
+    );
+
+    cryptomachine::destroy_five_dice_sanity(
+        result
+    );
+
+    check(
+        result.aggregate.total == 0,
+        "destruction must clear aggregate total"
+    );
+
+    check(
+        result.aggregate.missing_face_count == 0,
+        "destruction must clear missing-face count"
+    );
+
+    check(
+        result.aggregate.longest_run == 0,
+        "destruction must clear aggregate longest run"
+    );
+
+    check(
+        result.aggregate.warning_count == 0,
+        "destruction must clear aggregate warnings"
+    );
+
+    for (std::size_t count :
+         result.aggregate.counts) {
+        check(
+            count == 0,
+            "destruction must clear aggregate counts"
+        );
+    }
+
+    for (const auto& die :
+         result.per_die) {
+        check(
+            die.rolls == 0,
+            "destruction must clear per-die roll count"
+        );
+
+        check(
+            die.sequence.empty(),
+            "destruction must clear per-die sequence"
+        );
+
+        check(
+            die.longest_run == 0,
+            "destruction must clear per-die longest run"
+        );
+
+        check(
+            die.warning_count == 0,
+            "destruction must clear per-die warnings"
+        );
+
+        for (std::size_t count :
+             die.counts) {
+            check(
+                count == 0,
+                "destruction must clear per-die counts"
+            );
+        }
+    }
+
+    check(
+        result.rolls_per_die == 0,
+        "destruction must clear rolls-per-die"
+    );
+
+    check(
+        result.warning_count == 0,
+        "destruction must clear combined warnings"
+    );
+}
+
 void test_incomplete_shake_rejected() {
     cryptomachine::FiveDiceSanity result;
 
@@ -294,6 +406,7 @@ int main() {
     test_stuck_die_detected();
     test_heavy_single_die_bias_detected();
     test_per_die_long_run_detected();
+    test_destroy_five_dice_sanity();
     test_incomplete_shake_rejected();
 
     if (failures != 0) {
@@ -309,3 +422,4 @@ int main() {
 
     return 0;
 }
+

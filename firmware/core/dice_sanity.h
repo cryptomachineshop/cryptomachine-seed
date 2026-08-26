@@ -85,4 +85,8 @@ bool analyze_five_dice(
     FiveDiceSanity& result
 );
 
+void destroy_five_dice_sanity(
+    FiveDiceSanity& result
+);
+
 }  // namespace cryptomachine

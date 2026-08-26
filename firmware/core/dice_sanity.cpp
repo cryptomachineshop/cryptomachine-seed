@@ -1,4 +1,5 @@
 #include "dice_sanity.h"
+#include "secure_zero.h"
 
 namespace cryptomachine {
 namespace {
@@ -362,6 +363,60 @@ bool analyze_five_dice(
     }
 
     return true;
+}
+
+void destroy_five_dice_sanity(
+    FiveDiceSanity& result
+) {
+    const auto wipe_string = [](std::string& value) {
+        if (!value.empty()) {
+            secure_zero(
+                value.data(),
+                value.size()
+            );
+        }
+
+        value.clear();
+    };
+
+    secure_zero(
+        result.aggregate.counts.data(),
+        result.aggregate.counts.size() *
+            sizeof(result.aggregate.counts[0])
+    );
+
+    secure_zero(
+        result.aggregate.missing_faces.data(),
+        result.aggregate.missing_faces.size() *
+            sizeof(result.aggregate.missing_faces[0])
+    );
+
+    for (std::string& warning :
+         result.aggregate.warnings) {
+        wipe_string(warning);
+    }
+
+    for (PerDieSanity& die : result.per_die) {
+        wipe_string(die.sequence);
+
+        secure_zero(
+            die.counts.data(),
+            die.counts.size() *
+                sizeof(die.counts[0])
+        );
+
+        for (std::string& warning :
+             die.warnings) {
+            wipe_string(warning);
+        }
+    }
+
+    for (std::string& warning :
+         result.warnings) {
+        wipe_string(warning);
+    }
+
+    result = {};
 }
 
 }  // namespace cryptomachine
