@@ -1,13 +1,13 @@
 #include "bip39.h"
+#include "bip39_wordlist.h"
 #include "dice_entropy.h"
 
-#include <filesystem>
-#include <fstream>
+#include <cstddef>
+#include <cstdint>
 #include <iostream>
 #include <span>
 #include <string>
 #include <string_view>
-#include <vector>
 
 namespace {
 
@@ -20,56 +20,9 @@ void check(bool condition, const std::string& message) {
     }
 }
 
-std::vector<std::string> load_wordlist() {
-    const std::filesystem::path path =
-        std::filesystem::path(CRYPTOMACHINE_SOURCE_DIR) /
-        "core" /
-        "bip39_english.txt";
-
-    std::ifstream file(path);
-
-    if (!file) {
-        std::cerr
-            << "Unable to open BIP39 word list: "
-            << path
-            << '\n';
-
-        return {};
-    }
-
-    std::vector<std::string> words;
-    std::string line;
-
-    while (std::getline(file, line)) {
-        if (!line.empty() && line.back() == '\r') {
-            line.pop_back();
-        }
-
-        if (!line.empty()) {
-            words.push_back(line);
-        }
-    }
-
-    return words;
-}
-
-std::vector<std::string_view> make_views(
-    const std::vector<std::string>& words
-) {
-    std::vector<std::string_view> views;
-    views.reserve(words.size());
-
-    for (const auto& word : words) {
-        views.emplace_back(word);
-    }
-
-    return views;
-}
-
 std::string mnemonic_from_dice(
     std::string_view dice,
-    std::size_t word_count,
-    std::span<const std::string_view> wordlist
+    std::size_t word_count
 ) {
     cryptomachine::DiceEntropy entropy;
 
@@ -97,13 +50,11 @@ std::string mnemonic_from_dice(
 
     return cryptomachine::bip39_mnemonic_to_string(
         mnemonic,
-        wordlist
+        cryptomachine::kBip39EnglishWordlist
     );
 }
 
-void test_12_word_pipeline(
-    std::span<const std::string_view> wordlist
-) {
+void test_12_word_pipeline() {
     constexpr std::string_view dice =
         "65515223131652132161133154444123616466443112153441";
 
@@ -114,8 +65,7 @@ void test_12_word_pipeline(
     const std::string actual =
         mnemonic_from_dice(
             dice,
-            12,
-            wordlist
+            12
         );
 
     check(
@@ -124,9 +74,7 @@ void test_12_word_pipeline(
     );
 }
 
-void test_24_word_pipeline(
-    std::span<const std::string_view> wordlist
-) {
+void test_24_word_pipeline() {
     constexpr std::string_view dice =
         "12345612345612345612345612345612345612345612345612"
         "34561234561234561234561234561234561234561234561234";
@@ -139,8 +87,7 @@ void test_24_word_pipeline(
     const std::string actual =
         mnemonic_from_dice(
             dice,
-            24,
-            wordlist
+            24
         );
 
     check(
@@ -152,26 +99,8 @@ void test_24_word_pipeline(
 }  // namespace
 
 int main() {
-    const auto words = load_wordlist();
-
-    check(
-        words.size() == cryptomachine::kBip39WordlistSize,
-        "BIP39 word list must contain 2048 words"
-    );
-
-    if (words.size() != cryptomachine::kBip39WordlistSize) {
-        return 1;
-    }
-
-    const auto views = make_views(words);
-
-    const std::span<const std::string_view> wordlist(
-        views.data(),
-        views.size()
-    );
-
-    test_12_word_pipeline(wordlist);
-    test_24_word_pipeline(wordlist);
+    test_12_word_pipeline();
+    test_24_word_pipeline();
 
     if (failures != 0) {
         std::cerr

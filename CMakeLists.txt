@@ -16,7 +16,9 @@ add_library(
     firmware/core/sha256.cpp
     firmware/core/bip39.cpp
     firmware/core/dice_entropy.cpp
+    firmware/core/bip39_wordlist.cpp
 )
+
 
 target_include_directories(
     cryptomachine_core
@@ -57,11 +59,6 @@ target_link_libraries(
         cryptomachine_core
 )
 
-target_compile_definitions(
-    test_cpp_bip39
-    PRIVATE
-        CRYPTOMACHINE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
-)
 
 add_executable(
     test_cpp_dice_entropy
@@ -79,11 +76,6 @@ target_link_libraries(
         cryptomachine_core
 )
 
-target_compile_definitions(
-    test_cpp_seed_pipeline
-    PRIVATE
-        CRYPTOMACHINE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
-)
 
 target_link_libraries(
     test_cpp_dice_entropy
