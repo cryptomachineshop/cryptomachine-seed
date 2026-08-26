@@ -20,6 +20,7 @@ add_library(
     firmware/core/dice_sanity.cpp
     firmware/core/seed_engine.cpp
     firmware/core/secure_zero.cpp
+    firmware/core/dice_session.cpp
 )
 
 target_include_directories(
@@ -118,6 +119,17 @@ target_link_libraries(
         cryptomachine_core
 )
 
+add_executable(
+    test_cpp_dice_session
+    firmware/host_tests/test_dice_session.cpp
+)
+
+target_link_libraries(
+    test_cpp_dice_session
+    PRIVATE
+        cryptomachine_core
+)
+
 enable_testing()
 
 add_test(
@@ -158,4 +170,9 @@ add_test(
 add_test(
     NAME cpp_secure_zero
     COMMAND test_cpp_secure_zero
+)
+
+add_test(
+    NAME cpp_dice_session
+    COMMAND test_cpp_dice_session
 )
