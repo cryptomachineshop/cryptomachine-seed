@@ -246,6 +246,15 @@ void create_header(
     );
 }
 
+void render_home();
+void render_word_count();
+void render_dice_intro();
+void render_dice_entry();
+void render_dice_shake_review();
+void render_dice_complete();
+void render_dice_sanity_warning();
+void render_dice_generate_confirm();
+
 void begin_dice_entry_event(
     lv_event_t* event
 ) {
@@ -267,12 +276,6 @@ void begin_dice_entry_event(
         seed_ui_render();
     }
 }
-
-void render_home();
-void render_word_count();
-void render_dice_intro();
-void render_dice_entry();
-void render_dice_shake_review();
 
 void create_from_dice_event(
     lv_event_t* event
@@ -356,6 +359,202 @@ void word_count_back_event(
 
     if (
         g_app->dice_word_count_back() ==
+        SeedAppStatus::Success
+    ) {
+        seed_ui_render();
+    }
+}
+
+void dice_face_event(
+    lv_event_t* event
+) {
+    if (
+        lv_event_get_code(event) !=
+        LV_EVENT_CLICKED
+    ) {
+        return;
+    }
+
+    if (
+        g_app == nullptr ||
+        g_dice_entry_count >= kDiceCount
+    ) {
+        return;
+    }
+
+    const char* face =
+        static_cast<const char*>(
+            lv_event_get_user_data(event)
+        );
+
+    if (
+        face == nullptr ||
+        face[0] < '1' ||
+        face[0] > '6'
+    ) {
+        return;
+    }
+
+    g_dice_entry[g_dice_entry_count] =
+        face[0];
+
+    ++g_dice_entry_count;
+
+    if (g_dice_entry_count == kDiceCount) {
+        const SeedAppStatus status =
+            g_app->enter_shake_for_review(
+                std::string_view(
+                    g_dice_entry.data(),
+                    g_dice_entry.size()
+                )
+            );
+
+        // The controller now owns its fixed copy.
+        // Wipe the UI-side entry buffer immediately.
+        wipe_dice_entry();
+
+        if (status == SeedAppStatus::Success) {
+            seed_ui_render();
+        }
+
+        return;
+    }
+
+    seed_ui_render();
+}
+
+void confirm_shake_event(
+    lv_event_t* event
+) {
+    if (
+        lv_event_get_code(event) !=
+        LV_EVENT_CLICKED
+    ) {
+        return;
+    }
+
+    if (g_app == nullptr) {
+        return;
+    }
+
+    wipe_dice_entry();
+
+    if (
+        g_app->confirm_pending_shake() ==
+        SeedAppStatus::Success
+    ) {
+        seed_ui_render();
+    }
+}
+
+void reenter_shake_event(
+    lv_event_t* event
+) {
+    if (
+        lv_event_get_code(event) !=
+        LV_EVENT_CLICKED
+    ) {
+        return;
+    }
+
+    if (g_app == nullptr) {
+        return;
+    }
+
+    wipe_dice_entry();
+
+    if (
+        g_app->reenter_pending_shake() ==
+        SeedAppStatus::Success
+    ) {
+        seed_ui_render();
+    }
+}
+
+void dice_complete_continue_event(
+    lv_event_t* event
+) {
+    if (
+        lv_event_get_code(event) !=
+        LV_EVENT_CLICKED
+    ) {
+        return;
+    }
+
+    if (g_app == nullptr) {
+        return;
+    }
+
+    if (
+        g_app->continue_from_dice_complete() ==
+        SeedAppStatus::Success
+    ) {
+        seed_ui_render();
+    }
+}
+
+void sanity_continue_event(
+    lv_event_t* event
+) {
+    if (
+        lv_event_get_code(event) !=
+        LV_EVENT_CLICKED
+    ) {
+        return;
+    }
+
+    if (g_app == nullptr) {
+        return;
+    }
+
+    if (
+        g_app->sanity_continue_anyway() ==
+        SeedAppStatus::Success
+    ) {
+        seed_ui_render();
+    }
+}
+
+void sanity_restart_event(
+    lv_event_t* event
+) {
+    if (
+        lv_event_get_code(event) !=
+        LV_EVENT_CLICKED
+    ) {
+        return;
+    }
+
+    if (g_app == nullptr) {
+        return;
+    }
+
+    wipe_dice_entry();
+
+    if (
+        g_app->sanity_restart() ==
+        SeedAppStatus::Success
+    ) {
+        seed_ui_render();
+    }
+}
+
+void generate_back_event(
+    lv_event_t* event
+) {
+    if (
+        lv_event_get_code(event) !=
+        LV_EVENT_CLICKED
+    ) {
+        return;
+    }
+
+    if (g_app == nullptr) {
+        return;
+    }
+
+    if (
+        g_app->generate_back() ==
         SeedAppStatus::Success
     ) {
         seed_ui_render();
@@ -589,112 +788,6 @@ void render_dice_intro() {
     );
 }
 
-void dice_face_event(
-    lv_event_t* event
-) {
-    if (
-        lv_event_get_code(event) !=
-        LV_EVENT_CLICKED
-    ) {
-        return;
-    }
-
-    if (
-        g_app == nullptr ||
-        g_dice_entry_count >= kDiceCount
-    ) {
-        return;
-    }
-
-    const char* face =
-        static_cast<const char*>(
-            lv_event_get_user_data(event)
-        );
-
-    if (
-        face == nullptr ||
-        face[0] < '1' ||
-        face[0] > '6'
-    ) {
-        return;
-    }
-
-    g_dice_entry[g_dice_entry_count] =
-        face[0];
-
-    ++g_dice_entry_count;
-
-    if (g_dice_entry_count == kDiceCount) {
-        const SeedAppStatus status =
-            g_app->enter_shake_for_review(
-                std::string_view(
-                    g_dice_entry.data(),
-                    g_dice_entry.size()
-                )
-            );
-
-        // The controller now owns its fixed copy.
-        // Wipe the UI-side entry buffer immediately.
-        wipe_dice_entry();
-
-        if (status == SeedAppStatus::Success) {
-            seed_ui_render();
-        }
-
-        return;
-    }
-
-    seed_ui_render();
-}
-
-void confirm_shake_event(
-    lv_event_t* event
-) {
-    if (
-        lv_event_get_code(event) !=
-        LV_EVENT_CLICKED
-    ) {
-        return;
-    }
-
-    if (g_app == nullptr) {
-        return;
-    }
-
-    wipe_dice_entry();
-
-    if (
-        g_app->confirm_pending_shake() ==
-        SeedAppStatus::Success
-    ) {
-        seed_ui_render();
-    }
-}
-
-void reenter_shake_event(
-    lv_event_t* event
-) {
-    if (
-        lv_event_get_code(event) !=
-        LV_EVENT_CLICKED
-    ) {
-        return;
-    }
-
-    if (g_app == nullptr) {
-        return;
-    }
-
-    wipe_dice_entry();
-
-    if (
-        g_app->reenter_pending_shake() ==
-        SeedAppStatus::Success
-    ) {
-        seed_ui_render();
-    }
-}
-
 void render_dice_entry() {
     prepare_screen();
 
@@ -794,20 +887,6 @@ void render_dice_entry() {
                 const_cast<char*>(faces[i])
             );
         }
-    } else {
-        lv_obj_t* ready =
-            make_label(
-                "Ready for shake review",
-                &lv_font_montserrat_16,
-                kWhite
-            );
-
-        lv_obj_align(
-            ready,
-            LV_ALIGN_CENTER,
-            0,
-            140
-        );
     }
 }
 
@@ -897,6 +976,258 @@ void render_dice_shake_review() {
     );
 }
 
+void render_dice_complete() {
+    prepare_screen();
+
+    create_header(
+        "Dice Complete",
+        "All required physical dice "
+        "outcomes have been captured."
+    );
+
+    const char* ceremony_text =
+        g_app != nullptr &&
+        g_app->word_count() == 24
+            ? "20 SHAKES COMPLETE"
+            : "10 SHAKES COMPLETE";
+
+    lv_obj_t* complete =
+        make_label(
+            ceremony_text,
+            &lv_font_montserrat_24,
+            kOrange
+        );
+
+    lv_obj_align(
+        complete,
+        LV_ALIGN_CENTER,
+        0,
+        15
+    );
+
+    lv_obj_t* message =
+        make_label(
+            "Next: dice sanity checks "
+            "before seed generation.",
+            &lv_font_montserrat_14,
+            kWhite
+        );
+
+    lv_obj_set_width(
+        message,
+        260
+    );
+
+    lv_label_set_long_mode(
+        message,
+        LV_LABEL_LONG_WRAP
+    );
+
+    lv_obj_set_style_text_align(
+        message,
+        LV_TEXT_ALIGN_CENTER,
+        0
+    );
+
+    lv_obj_align(
+        message,
+        LV_ALIGN_CENTER,
+        0,
+        75
+    );
+
+    lv_obj_t* button =
+        make_button(
+            "CONTINUE",
+            250,
+            70,
+            kOrange,
+            kBackground
+        );
+
+    lv_obj_align(
+        button,
+        LV_ALIGN_BOTTOM_MID,
+        0,
+        -38
+    );
+
+    lv_obj_add_event_cb(
+        button,
+        dice_complete_continue_event,
+        LV_EVENT_CLICKED,
+        nullptr
+    );
+}
+
+void render_dice_sanity_warning() {
+    prepare_screen();
+
+    create_header(
+        "Dice Warning",
+        "The entered dice show an unusual "
+        "pattern."
+    );
+
+    lv_obj_t* warning =
+        make_label(
+            "This does not prove the dice are "
+            "invalid, but the pattern deserves "
+            "attention before generating a seed.",
+            &lv_font_montserrat_14,
+            kWhite
+        );
+
+    lv_obj_set_width(
+        warning,
+        270
+    );
+
+    lv_label_set_long_mode(
+        warning,
+        LV_LABEL_LONG_WRAP
+    );
+
+    lv_obj_set_style_text_align(
+        warning,
+        LV_TEXT_ALIGN_CENTER,
+        0
+    );
+
+    lv_obj_align(
+        warning,
+        LV_ALIGN_CENTER,
+        0,
+        -25
+    );
+
+    lv_obj_t* continue_button =
+        make_button(
+            "CONTINUE ANYWAY",
+            250,
+            68,
+            kOrange,
+            kBackground
+        );
+
+    lv_obj_align(
+        continue_button,
+        LV_ALIGN_CENTER,
+        0,
+        82
+    );
+
+    lv_obj_add_event_cb(
+        continue_button,
+        sanity_continue_event,
+        LV_EVENT_CLICKED,
+        nullptr
+    );
+
+    lv_obj_t* restart_button =
+        make_button(
+            "RESTART DICE",
+            210,
+            54,
+            kButtonDark,
+            kWhite
+        );
+
+    lv_obj_align(
+        restart_button,
+        LV_ALIGN_BOTTOM_MID,
+        0,
+        -24
+    );
+
+    lv_obj_add_event_cb(
+        restart_button,
+        sanity_restart_event,
+        LV_EVENT_CLICKED,
+        nullptr
+    );
+}
+
+void render_dice_generate_confirm() {
+    prepare_screen();
+
+    create_header(
+        "Generate Seed",
+        "Dice collection and sanity checks "
+        "are complete."
+    );
+
+    lv_obj_t* ready =
+        make_label(
+            "READY TO GENERATE",
+            &lv_font_montserrat_24,
+            kOrange
+        );
+
+    lv_obj_align(
+        ready,
+        LV_ALIGN_CENTER,
+        0,
+        5
+    );
+
+    lv_obj_t* message =
+        make_label(
+            "The mnemonic renderer is the next "
+            "security milestone. Seed generation "
+            "is intentionally not triggered from "
+            "this screen yet.",
+            &lv_font_montserrat_14,
+            kWhite
+        );
+
+    lv_obj_set_width(
+        message,
+        270
+    );
+
+    lv_label_set_long_mode(
+        message,
+        LV_LABEL_LONG_WRAP
+    );
+
+    lv_obj_set_style_text_align(
+        message,
+        LV_TEXT_ALIGN_CENTER,
+        0
+    );
+
+    lv_obj_align(
+        message,
+        LV_ALIGN_CENTER,
+        0,
+        78
+    );
+
+    lv_obj_t* back =
+        make_button(
+            "BACK",
+            160,
+            54,
+            kButtonDark,
+            kWhite
+        );
+
+    lv_obj_align(
+        back,
+        LV_ALIGN_BOTTOM_MID,
+        0,
+        -24
+    );
+
+    lv_obj_add_event_cb(
+        back,
+        generate_back_event,
+        LV_EVENT_CLICKED,
+        nullptr
+    );
+}
+
 }  // namespace
 
 void seed_ui_init(
@@ -930,6 +1261,18 @@ void seed_ui_render() {
 
         case UIState::DiceShakeReview:
             render_dice_shake_review();
+            break;
+
+        case UIState::DiceComplete:
+            render_dice_complete();
+            break;
+
+        case UIState::DiceSanityWarning:
+            render_dice_sanity_warning();
+            break;
+
+        case UIState::DiceGenerateConfirm:
+            render_dice_generate_confirm();
             break;
 
         default:
