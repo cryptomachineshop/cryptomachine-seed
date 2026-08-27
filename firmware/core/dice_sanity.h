@@ -4,7 +4,7 @@
 
 #include <array>
 #include <cstddef>
-#include <string>
+#include <cstdint>
 #include <string_view>
 
 namespace cryptomachine {
@@ -20,6 +20,40 @@ constexpr std::size_t kMaxFiveDiceWarnings =
 using DiceFaceCounts =
     std::array<std::size_t, kFaceCount>;
 
+enum class DiceSanityWarningCode : std::uint8_t {
+    None = 0,
+    AggregateMissingFaces,
+    AggregateLongRun,
+    AggregateFaceBias,
+    PerDieFixed,
+    PerDieFaceConcentration,
+    PerDieLongRun,
+};
+
+// Fixed-size warning metadata.
+//
+// No warning text or dice sequence is stored here. The UI currently
+// presents a generic warning, and these fields retain enough metadata
+// for future deterministic formatting without retaining extra copies
+// of the raw dice history.
+struct DiceSanityWarning {
+    DiceSanityWarningCode code =
+        DiceSanityWarningCode::None;
+
+    // 0 for aggregate warnings, 1 through 5 for per-die warnings.
+    std::uint8_t die_number = 0;
+
+    // Used by face-specific warnings, otherwise '\0'.
+    char face = '\0';
+
+    // Used by concentration/bias warnings.
+    std::size_t observed = 0;
+    std::size_t total = 0;
+
+    // Used by repeated-run warnings.
+    std::size_t run_length = 0;
+};
+
 struct AggregateDiceSanity {
     std::size_t total = 0;
 
@@ -30,8 +64,10 @@ struct AggregateDiceSanity {
 
     std::size_t longest_run = 0;
 
-    std::array<std::string, kMaxAggregateWarnings>
-        warnings{};
+    std::array<
+        DiceSanityWarning,
+        kMaxAggregateWarnings
+    > warnings{};
 
     std::size_t warning_count = 0;
 };
@@ -39,14 +75,14 @@ struct AggregateDiceSanity {
 struct PerDieSanity {
     std::size_t rolls = 0;
 
-    std::string sequence;
-
     DiceFaceCounts counts{};
 
     std::size_t longest_run = 0;
 
-    std::array<std::string, kMaxPerDieWarnings>
-        warnings{};
+    std::array<
+        DiceSanityWarning,
+        kMaxPerDieWarnings
+    > warnings{};
 
     std::size_t warning_count = 0;
 };
@@ -58,9 +94,9 @@ struct FiveDiceSanity {
 
     std::array<PerDieSanity, kDiceCount> per_die{};
 
-    std::array<std::string, kMaxFiveDiceWarnings>
-        warnings{};
-
+    // Total warnings across aggregate + all five dice.
+    // Warning records remain in their owning aggregate/per-die
+    // structures instead of being copied into a second combined list.
     std::size_t warning_count = 0;
 };
 
@@ -79,12 +115,17 @@ bool analyze_dice(
 // Input must contain a complete multiple of five
 // valid dice outcomes.
 //
+// Analysis is allocation-free and does not construct per-die
+// sequence copies. It scans the caller-owned canonical dice
+// stream directly.
+//
 // Returns false for invalid input.
 bool analyze_five_dice(
     std::string_view dice,
     FiveDiceSanity& result
 );
 
+// Securely wipes all fixed-size sanity metadata.
 void destroy_five_dice_sanity(
     FiveDiceSanity& result
 );

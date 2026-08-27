@@ -1,8 +1,23 @@
 #include "dice_sanity.h"
+
 #include "secure_zero.h"
+
+#include <type_traits>
 
 namespace cryptomachine {
 namespace {
+
+static_assert(
+    std::is_trivially_copyable_v<AggregateDiceSanity>
+);
+
+static_assert(
+    std::is_trivially_copyable_v<PerDieSanity>
+);
+
+static_assert(
+    std::is_trivially_copyable_v<FiveDiceSanity>
+);
 
 bool valid_dice_string(std::string_view dice) {
     if (dice.empty()) {
@@ -47,54 +62,23 @@ std::size_t longest_identical_run(
     return longest;
 }
 
-bool all_same(std::string_view sequence) {
-    if (sequence.empty()) {
-        return false;
-    }
-
-    const char first = sequence.front();
-
-    for (const char face : sequence) {
-        if (face != first) {
-            return false;
-        }
-    }
-
-    return true;
+void clear_aggregate(
+    AggregateDiceSanity& result
+) {
+    secure_zero(
+        &result,
+        sizeof(result)
+    );
 }
 
 void add_aggregate_warning(
     AggregateDiceSanity& result,
-    std::string warning
+    const DiceSanityWarning& warning
 ) {
-    if (result.warning_count <
-        result.warnings.size()) {
-        result.warnings[result.warning_count] =
-            std::move(warning);
-
-        ++result.warning_count;
-    }
-}
-
-void add_per_die_warning(
-    PerDieSanity& result,
-    std::string warning
-) {
-    if (result.warning_count <
-        result.warnings.size()) {
-        result.warnings[result.warning_count] =
-            std::move(warning);
-
-        ++result.warning_count;
-    }
-}
-
-void add_combined_warning(
-    FiveDiceSanity& result,
-    const std::string& warning
-) {
-    if (result.warning_count <
-        result.warnings.size()) {
+    if (
+        result.warning_count <
+        result.warnings.size()
+    ) {
         result.warnings[result.warning_count] =
             warning;
 
@@ -102,8 +86,24 @@ void add_combined_warning(
     }
 }
 
-char most_common_face(
-    std::string_view sequence,
+void add_per_die_warning(
+    PerDieSanity& result,
+    const DiceSanityWarning& warning
+) {
+    if (
+        result.warning_count <
+        result.warnings.size()
+    ) {
+        result.warnings[result.warning_count] =
+            warning;
+
+        ++result.warning_count;
+    }
+}
+
+char most_common_face_for_die(
+    std::string_view dice,
+    std::size_t die_index,
     const DiceFaceCounts& counts
 ) {
     std::size_t highest_count = 0;
@@ -114,12 +114,21 @@ char most_common_face(
         }
     }
 
-    // Match Python Counter.most_common() tie behavior:
-    // when counts tie, use the face encountered first
-    // in the original sequence.
-    for (const char face : sequence) {
-        if (counts[face_index(face)] ==
-            highest_count) {
+    // Match Python Counter.most_common() tie behavior without
+    // constructing a per-die sequence: among equally common
+    // faces, return whichever was encountered first for this
+    // physical die in the canonical interleaved dice stream.
+    for (
+        std::size_t position = die_index;
+        position < dice.size();
+        position += kDiceCount
+    ) {
+        const char face = dice[position];
+
+        if (
+            counts[face_index(face)] ==
+            highest_count
+        ) {
             return face;
         }
     }
@@ -133,7 +142,9 @@ bool analyze_dice(
     std::string_view dice,
     AggregateDiceSanity& result
 ) {
-    result = {};
+    // Safe on reuse because the result is fixed-size and
+    // trivially copyable. No heap-backed strings are released.
+    clear_aggregate(result);
 
     if (!valid_dice_string(dice)) {
         return false;
@@ -159,18 +170,28 @@ bool analyze_dice(
         longest_identical_run(dice);
 
     if (result.missing_face_count != 0) {
+        DiceSanityWarning warning{};
+        warning.code =
+            DiceSanityWarningCode::
+                AggregateMissingFaces;
+
         add_aggregate_warning(
             result,
-            "One or more die faces never appeared "
-            "in the combined results."
+            warning
         );
     }
 
     if (result.longest_run >= 8) {
+        DiceSanityWarning warning{};
+        warning.code =
+            DiceSanityWarningCode::
+                AggregateLongRun;
+        warning.run_length =
+            result.longest_run;
+
         add_aggregate_warning(
             result,
-            "An unusually long repeated-face run "
-            "was detected in the combined results."
+            warning
         );
     }
 
@@ -184,17 +205,24 @@ bool analyze_dice(
         //
         // count * 3 > total
         for (std::size_t i = 0; i < kFaceCount; ++i) {
-            if (result.counts[i] * 3 >
-                result.total) {
-                const char face =
+            if (
+                result.counts[i] * 3 >
+                result.total
+            ) {
+                DiceSanityWarning warning{};
+                warning.code =
+                    DiceSanityWarningCode::
+                        AggregateFaceBias;
+                warning.face =
                     static_cast<char>('1' + i);
+                warning.observed =
+                    result.counts[i];
+                warning.total =
+                    result.total;
 
                 add_aggregate_warning(
                     result,
-                    std::string("Face ") +
-                    face +
-                    " appeared unusually often "
-                    "in the combined results."
+                    warning
                 );
 
                 break;
@@ -209,7 +237,12 @@ bool analyze_five_dice(
     std::string_view dice,
     FiveDiceSanity& result
 ) {
-    result = {};
+    // Full-object wipe is valid because the report contains
+    // only fixed-size trivially-copyable data.
+    secure_zero(
+        &result,
+        sizeof(result)
+    );
 
     if (!valid_dice_string(dice)) {
         return false;
@@ -230,17 +263,6 @@ bool analyze_five_dice(
         dice.size() / kDiceCount;
 
     for (
-        std::size_t i = 0;
-        i < result.aggregate.warning_count;
-        ++i
-    ) {
-        add_combined_warning(
-            result,
-            result.aggregate.warnings[i]
-        );
-    }
-
-    for (
         std::size_t die_index = 0;
         die_index < kDiceCount;
         ++die_index
@@ -248,44 +270,79 @@ bool analyze_five_dice(
         PerDieSanity& die =
             result.per_die[die_index];
 
-        die.rolls = result.rolls_per_die;
+        die.rolls =
+            result.rolls_per_die;
 
-        die.sequence.reserve(
-            result.rolls_per_die
-        );
+        char previous_face = '\0';
+        std::size_t current_run = 0;
 
         for (
             std::size_t position = die_index;
             position < dice.size();
             position += kDiceCount
         ) {
-            die.sequence.push_back(
-                dice[position]
-            );
+            const char face =
+                dice[position];
+
+            ++die.counts[
+                face_index(face)
+            ];
+
+            if (
+                current_run == 0 ||
+                face != previous_face
+            ) {
+                current_run = 1;
+            } else {
+                ++current_run;
+            }
+
+            if (
+                current_run >
+                die.longest_run
+            ) {
+                die.longest_run =
+                    current_run;
+            }
+
+            previous_face = face;
         }
 
-        for (const char face : die.sequence) {
-            ++die.counts[face_index(face)];
-        }
-
-        die.longest_run =
-            longest_identical_run(
-                die.sequence
+        const char common_face =
+            most_common_face_for_die(
+                dice,
+                die_index,
+                die.counts
             );
 
-        const std::string die_name =
-            "D" +
-            std::to_string(die_index + 1);
+        const std::size_t common_count =
+            die.counts[
+                face_index(common_face)
+            ];
 
         const bool fixed_die =
-            all_same(die.sequence);
+            common_count ==
+            result.rolls_per_die;
 
         if (fixed_die) {
+            DiceSanityWarning warning{};
+            warning.code =
+                DiceSanityWarningCode::
+                    PerDieFixed;
+            warning.die_number =
+                static_cast<std::uint8_t>(
+                    die_index + 1
+                );
+            warning.face =
+                common_face;
+            warning.observed =
+                common_count;
+            warning.total =
+                result.rolls_per_die;
+
             add_per_die_warning(
                 die,
-                die_name +
-                " produced the same face "
-                "on every recorded shake."
+                warning
             );
         }
 
@@ -303,35 +360,30 @@ bool analyze_five_dice(
                     + 3
                 ) / 4;
 
-        const char common_face =
-            most_common_face(
-                die.sequence,
-                die.counts
-            );
-
-        const std::size_t common_count =
-            die.counts[
-                face_index(common_face)
-            ];
-
         if (
             result.rolls_per_die >= 10 &&
             common_count >=
                 concentration_threshold &&
             !fixed_die
         ) {
+            DiceSanityWarning warning{};
+            warning.code =
+                DiceSanityWarningCode::
+                    PerDieFaceConcentration;
+            warning.die_number =
+                static_cast<std::uint8_t>(
+                    die_index + 1
+                );
+            warning.face =
+                common_face;
+            warning.observed =
+                common_count;
+            warning.total =
+                result.rolls_per_die;
+
             add_per_die_warning(
                 die,
-                die_name +
-                " produced face " +
-                common_face +
-                " on " +
-                std::to_string(common_count) +
-                " of " +
-                std::to_string(
-                    result.rolls_per_die
-                ) +
-                " shakes."
+                warning
             );
         }
 
@@ -339,27 +391,30 @@ bool analyze_five_dice(
             die.longest_run >= 6 &&
             !fixed_die
         ) {
+            DiceSanityWarning warning{};
+            warning.code =
+                DiceSanityWarningCode::
+                    PerDieLongRun;
+            warning.die_number =
+                static_cast<std::uint8_t>(
+                    die_index + 1
+                );
+            warning.run_length =
+                die.longest_run;
+
             add_per_die_warning(
                 die,
-                die_name +
-                " produced the same face for " +
-                std::to_string(
-                    die.longest_run
-                ) +
-                " consecutive shakes."
+                warning
             );
         }
+    }
 
-        for (
-            std::size_t i = 0;
-            i < die.warning_count;
-            ++i
-        ) {
-            add_combined_warning(
-                result,
-                die.warnings[i]
-            );
-        }
+    result.warning_count =
+        result.aggregate.warning_count;
+
+    for (const PerDieSanity& die : result.per_die) {
+        result.warning_count +=
+            die.warning_count;
     }
 
     return true;
@@ -368,55 +423,10 @@ bool analyze_five_dice(
 void destroy_five_dice_sanity(
     FiveDiceSanity& result
 ) {
-    const auto wipe_string = [](std::string& value) {
-        if (!value.empty()) {
-            secure_zero(
-                value.data(),
-                value.size()
-            );
-        }
-
-        value.clear();
-    };
-
     secure_zero(
-        result.aggregate.counts.data(),
-        result.aggregate.counts.size() *
-            sizeof(result.aggregate.counts[0])
+        &result,
+        sizeof(result)
     );
-
-    secure_zero(
-        result.aggregate.missing_faces.data(),
-        result.aggregate.missing_faces.size() *
-            sizeof(result.aggregate.missing_faces[0])
-    );
-
-    for (std::string& warning :
-         result.aggregate.warnings) {
-        wipe_string(warning);
-    }
-
-    for (PerDieSanity& die : result.per_die) {
-        wipe_string(die.sequence);
-
-        secure_zero(
-            die.counts.data(),
-            die.counts.size() *
-                sizeof(die.counts[0])
-        );
-
-        for (std::string& warning :
-             die.warnings) {
-            wipe_string(warning);
-        }
-    }
-
-    for (std::string& warning :
-         result.warnings) {
-        wipe_string(warning);
-    }
-
-    result = {};
 }
 
 }  // namespace cryptomachine
