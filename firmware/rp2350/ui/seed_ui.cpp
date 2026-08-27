@@ -17,6 +17,9 @@ namespace {
 
 SeedAppController* g_app = nullptr;
 
+SeedUiFault g_ui_fault =
+    SeedUiFault::None;
+
 std::array<char, kDiceCount> g_dice_entry{};
 std::size_t g_dice_entry_count = 0;
 
@@ -88,6 +91,52 @@ void reset_sensitive_ui_state() {
     clear_sensitive_word_label_refs();
     wipe_dice_entry();
     g_mnemonic_word_index = 0;
+}
+
+
+void latch_ui_fault(
+    SeedUiFault fault
+) {
+    if (
+        g_ui_fault ==
+        SeedUiFault::None
+    ) {
+        g_ui_fault = fault;
+    }
+}
+
+SeedAppController* app_or_fault() {
+    if (g_app == nullptr) {
+        latch_ui_fault(
+            SeedUiFault::UnexpectedApplicationState
+        );
+
+        return nullptr;
+    }
+
+    return g_app;
+}
+
+bool controller_action_succeeded(
+    SeedAppStatus status
+) {
+    if (status == SeedAppStatus::Success) {
+        return true;
+    }
+
+    latch_ui_fault(
+        SeedUiFault::ControllerActionError
+    );
+
+    return false;
+}
+
+void render_after_controller_action(
+    SeedAppStatus status
+) {
+    if (controller_action_succeeded(status)) {
+        seed_ui_render();
+    }
 }
 
 constexpr lv_color_t kBackground =
@@ -398,16 +447,16 @@ void begin_dice_entry_event(
         return;
     }
 
-    if (g_app == nullptr) {
+    SeedAppController* app =
+        app_or_fault();
+
+    if (app == nullptr) {
         return;
     }
 
-    if (
-        g_app->begin_dice_entry() ==
-        SeedAppStatus::Success
-    ) {
-        seed_ui_render();
-    }
+    render_after_controller_action(
+        app->begin_dice_entry()
+    );
 }
 
 void create_from_dice_event(
@@ -420,16 +469,16 @@ void create_from_dice_event(
         return;
     }
 
-    if (g_app == nullptr) {
+    SeedAppController* app =
+        app_or_fault();
+
+    if (app == nullptr) {
         return;
     }
 
-    if (
-        g_app->open_create_from_dice() ==
-        SeedAppStatus::Success
-    ) {
-        seed_ui_render();
-    }
+    render_after_controller_action(
+        app->open_create_from_dice()
+    );
 }
 
 void choose_12_event(
@@ -442,16 +491,16 @@ void choose_12_event(
         return;
     }
 
-    if (g_app == nullptr) {
+    SeedAppController* app =
+        app_or_fault();
+
+    if (app == nullptr) {
         return;
     }
 
-    if (
-        g_app->choose_dice_word_count(12) ==
-        SeedAppStatus::Success
-    ) {
-        seed_ui_render();
-    }
+    render_after_controller_action(
+        app->choose_dice_word_count(12)
+    );
 }
 
 void choose_24_event(
@@ -464,16 +513,16 @@ void choose_24_event(
         return;
     }
 
-    if (g_app == nullptr) {
+    SeedAppController* app =
+        app_or_fault();
+
+    if (app == nullptr) {
         return;
     }
 
-    if (
-        g_app->choose_dice_word_count(24) ==
-        SeedAppStatus::Success
-    ) {
-        seed_ui_render();
-    }
+    render_after_controller_action(
+        app->choose_dice_word_count(24)
+    );
 }
 
 void word_count_back_event(
@@ -486,16 +535,16 @@ void word_count_back_event(
         return;
     }
 
-    if (g_app == nullptr) {
+    SeedAppController* app =
+        app_or_fault();
+
+    if (app == nullptr) {
         return;
     }
 
-    if (
-        g_app->dice_word_count_back() ==
-        SeedAppStatus::Success
-    ) {
-        seed_ui_render();
-    }
+    render_after_controller_action(
+        app->dice_word_count_back()
+    );
 }
 
 void dice_face_event(
@@ -508,10 +557,17 @@ void dice_face_event(
         return;
     }
 
-    if (
-        g_app == nullptr ||
-        g_dice_entry_count >= kDiceCount
-    ) {
+    SeedAppController* app =
+        app_or_fault();
+
+    if (app == nullptr) {
+        return;
+    }
+
+    if (g_dice_entry_count >= kDiceCount) {
+        latch_ui_fault(
+            SeedUiFault::UnexpectedApplicationState
+        );
         return;
     }
 
@@ -525,6 +581,9 @@ void dice_face_event(
         face[0] < '1' ||
         face[0] > '6'
     ) {
+        latch_ui_fault(
+            SeedUiFault::UnexpectedApplicationState
+        );
         return;
     }
 
@@ -535,18 +594,20 @@ void dice_face_event(
 
     if (g_dice_entry_count == kDiceCount) {
         const SeedAppStatus status =
-            g_app->enter_shake_for_review(
+            app->enter_shake_for_review(
                 std::string_view(
                     g_dice_entry.data(),
                     g_dice_entry.size()
                 )
             );
 
-        // The controller now owns its fixed copy.
-        // Wipe the UI-side entry buffer immediately.
         wipe_dice_entry();
 
-        if (status == SeedAppStatus::Success) {
+        if (
+            controller_action_succeeded(
+                status
+            )
+        ) {
             seed_ui_render();
         }
 
@@ -566,18 +627,18 @@ void confirm_shake_event(
         return;
     }
 
-    if (g_app == nullptr) {
+    SeedAppController* app =
+        app_or_fault();
+
+    if (app == nullptr) {
         return;
     }
 
     wipe_dice_entry();
 
-    if (
-        g_app->confirm_pending_shake() ==
-        SeedAppStatus::Success
-    ) {
-        seed_ui_render();
-    }
+    render_after_controller_action(
+        app->confirm_pending_shake()
+    );
 }
 
 void reenter_shake_event(
@@ -590,18 +651,18 @@ void reenter_shake_event(
         return;
     }
 
-    if (g_app == nullptr) {
+    SeedAppController* app =
+        app_or_fault();
+
+    if (app == nullptr) {
         return;
     }
 
     wipe_dice_entry();
 
-    if (
-        g_app->reenter_pending_shake() ==
-        SeedAppStatus::Success
-    ) {
-        seed_ui_render();
-    }
+    render_after_controller_action(
+        app->reenter_pending_shake()
+    );
 }
 
 void dice_complete_continue_event(
@@ -614,16 +675,16 @@ void dice_complete_continue_event(
         return;
     }
 
-    if (g_app == nullptr) {
+    SeedAppController* app =
+        app_or_fault();
+
+    if (app == nullptr) {
         return;
     }
 
-    if (
-        g_app->continue_from_dice_complete() ==
-        SeedAppStatus::Success
-    ) {
-        seed_ui_render();
-    }
+    render_after_controller_action(
+        app->continue_from_dice_complete()
+    );
 }
 
 void sanity_continue_event(
@@ -636,16 +697,16 @@ void sanity_continue_event(
         return;
     }
 
-    if (g_app == nullptr) {
+    SeedAppController* app =
+        app_or_fault();
+
+    if (app == nullptr) {
         return;
     }
 
-    if (
-        g_app->sanity_continue_anyway() ==
-        SeedAppStatus::Success
-    ) {
-        seed_ui_render();
-    }
+    render_after_controller_action(
+        app->sanity_continue_anyway()
+    );
 }
 
 void sanity_restart_event(
@@ -658,18 +719,18 @@ void sanity_restart_event(
         return;
     }
 
-    if (g_app == nullptr) {
+    SeedAppController* app =
+        app_or_fault();
+
+    if (app == nullptr) {
         return;
     }
 
     wipe_dice_entry();
 
-    if (
-        g_app->sanity_restart() ==
-        SeedAppStatus::Success
-    ) {
-        seed_ui_render();
-    }
+    render_after_controller_action(
+        app->sanity_restart()
+    );
 }
 
 void generate_back_event(
@@ -682,16 +743,16 @@ void generate_back_event(
         return;
     }
 
-    if (g_app == nullptr) {
+    SeedAppController* app =
+        app_or_fault();
+
+    if (app == nullptr) {
         return;
     }
 
-    if (
-        g_app->generate_back() ==
-        SeedAppStatus::Success
-    ) {
-        seed_ui_render();
-    }
+    render_after_controller_action(
+        app->generate_back()
+    );
 }
 
 void generate_mnemonic_event(
@@ -704,13 +765,17 @@ void generate_mnemonic_event(
         return;
     }
 
-    if (g_app == nullptr) {
+    SeedAppController* app =
+        app_or_fault();
+
+    if (app == nullptr) {
         return;
     }
 
     if (
-        g_app->generate_mnemonic() ==
-        SeedAppStatus::Success
+        controller_action_succeeded(
+            app->generate_mnemonic()
+        )
     ) {
         g_mnemonic_word_index = 0;
         seed_ui_render();
@@ -745,19 +810,38 @@ void mnemonic_next_event(
         return;
     }
 
-    if (g_app == nullptr) {
+    SeedAppController* app =
+        app_or_fault();
+
+    if (app == nullptr) {
         return;
     }
 
     const SeedResult* result =
-        g_app->seed_result();
+        app->seed_result();
 
     if (
         result == nullptr ||
-        result->mnemonic.word_count == 0 ||
-        result->mnemonic.word_count >
-            kWordCount24
+        (
+            result->mnemonic.word_count !=
+                kWordCount12 &&
+            result->mnemonic.word_count !=
+                kWordCount24
+        )
     ) {
+        latch_ui_fault(
+            SeedUiFault::InvalidSeedResult
+        );
+        return;
+    }
+
+    if (
+        g_mnemonic_word_index >=
+        result->mnemonic.word_count
+    ) {
+        latch_ui_fault(
+            SeedUiFault::UnexpectedApplicationState
+        );
         return;
     }
 
@@ -770,12 +854,9 @@ void mnemonic_next_event(
         return;
     }
 
-    if (
-        g_app->mnemonic_words_complete() ==
-        SeedAppStatus::Success
-    ) {
-        seed_ui_render();
-    }
+    render_after_controller_action(
+        app->mnemonic_words_complete()
+    );
 }
 
 void mnemonic_review_finish_event(
@@ -788,16 +869,16 @@ void mnemonic_review_finish_event(
         return;
     }
 
-    if (g_app == nullptr) {
+    SeedAppController* app =
+        app_or_fault();
+
+    if (app == nullptr) {
         return;
     }
 
-    if (
-        g_app->mnemonic_review_finish() ==
-        SeedAppStatus::Success
-    ) {
-        seed_ui_render();
-    }
+    render_after_controller_action(
+        app->mnemonic_review_finish()
+    );
 }
 
 void request_destroy_event(
@@ -810,16 +891,16 @@ void request_destroy_event(
         return;
     }
 
-    if (g_app == nullptr) {
+    SeedAppController* app =
+        app_or_fault();
+
+    if (app == nullptr) {
         return;
     }
 
-    if (
-        g_app->request_destroy() ==
-        SeedAppStatus::Success
-    ) {
-        seed_ui_render();
-    }
+    render_after_controller_action(
+        app->request_destroy()
+    );
 }
 
 void destroy_go_back_event(
@@ -832,16 +913,16 @@ void destroy_go_back_event(
         return;
     }
 
-    if (g_app == nullptr) {
+    SeedAppController* app =
+        app_or_fault();
+
+    if (app == nullptr) {
         return;
     }
 
-    if (
-        g_app->destroy_go_back() ==
-        SeedAppStatus::Success
-    ) {
-        seed_ui_render();
-    }
+    render_after_controller_action(
+        app->destroy_go_back()
+    );
 }
 
 void destroy_session_event(
@@ -854,7 +935,10 @@ void destroy_session_event(
         return;
     }
 
-    if (g_app == nullptr) {
+    SeedAppController* app =
+        app_or_fault();
+
+    if (app == nullptr) {
         return;
     }
 
@@ -862,17 +946,11 @@ void destroy_session_event(
     wipe_dice_entry();
     g_mnemonic_word_index = 0;
 
-    // Defense in depth: scrub the complete LVGL RGB565
-    // draw buffer before the controller destroys the
-    // mnemonic and dice session.
     lvgl_port_wipe_draw_buffer();
 
-    if (
-        g_app->destroy_session() ==
-        SeedAppStatus::Success
-    ) {
-        seed_ui_render();
-    }
+    render_after_controller_action(
+        app->destroy_session()
+    );
 }
 
 void render_home() {
@@ -1014,8 +1092,18 @@ void render_dice_intro() {
             ? g_app->word_count()
             : 0;
 
+    if (
+        words != kWordCount12 &&
+        words != kWordCount24
+    ) {
+        latch_ui_fault(
+            SeedUiFault::UnexpectedApplicationState
+        );
+        return;
+    }
+
     const char* length_text =
-        words == 24
+        words == kWordCount24
             ? "24-WORD SEED"
             : "12-WORD SEED";
 
@@ -1299,9 +1387,28 @@ void render_dice_complete() {
         "outcomes have been captured."
     );
 
+    SeedAppController* app =
+        app_or_fault();
+
+    if (app == nullptr) {
+        return;
+    }
+
+    const std::size_t words =
+        app->word_count();
+
+    if (
+        words != kWordCount12 &&
+        words != kWordCount24
+    ) {
+        latch_ui_fault(
+            SeedUiFault::UnexpectedApplicationState
+        );
+        return;
+    }
+
     const char* ceremony_text =
-        g_app != nullptr &&
-        g_app->word_count() == 24
+        words == kWordCount24
             ? "20 SHAKES COMPLETE"
             : "10 SHAKES COMPLETE";
 
@@ -1573,40 +1680,18 @@ void render_mnemonic_word_view() {
 
     if (
         result == nullptr ||
-        result->mnemonic.word_count == 0 ||
-        result->mnemonic.word_count >
-            kWordCount24 ||
+        (
+            result->mnemonic.word_count !=
+                kWordCount12 &&
+            result->mnemonic.word_count !=
+                kWordCount24
+        ) ||
         g_mnemonic_word_index >=
             result->mnemonic.word_count
     ) {
-        create_header(
-            "Mnemonic Error",
-            "Generated mnemonic is unavailable."
+        latch_ui_fault(
+            SeedUiFault::InvalidSeedResult
         );
-
-        lv_obj_t* destroy =
-            make_button(
-                "DESTROY SESSION",
-                230,
-                62,
-                kOrange,
-                kBackground
-            );
-
-        lv_obj_align(
-            destroy,
-            LV_ALIGN_CENTER,
-            0,
-            80
-        );
-
-        lv_obj_add_event_cb(
-            destroy,
-            request_destroy_event,
-            LV_EVENT_CLICKED,
-            nullptr
-        );
-
         return;
     }
 
@@ -1655,20 +1740,25 @@ void render_mnemonic_word_view() {
             52
         );
 
-    if (word != nullptr) {
-        lv_obj_set_style_text_align(
-            word,
-            LV_TEXT_ALIGN_CENTER,
-            0
+    if (word == nullptr) {
+        latch_ui_fault(
+            SeedUiFault::InvalidSeedResult
         );
-
-        lv_obj_align(
-            word,
-            LV_ALIGN_TOP_MID,
-            0,
-            250
-        );
+        return;
     }
+
+    lv_obj_set_style_text_align(
+        word,
+        LV_TEXT_ALIGN_CENTER,
+        0
+    );
+
+    lv_obj_align(
+        word,
+        LV_ALIGN_TOP_MID,
+        0,
+        250
+    );
 
     if (g_mnemonic_word_index > 0) {
         lv_obj_t* previous =
@@ -1765,11 +1855,9 @@ void render_mnemonic_full_review() {
                 kWordCount24
         )
     ) {
-        create_header(
-            "Mnemonic Error",
-            "Generated mnemonic is unavailable."
+        latch_ui_fault(
+            SeedUiFault::InvalidSeedResult
         );
-
         return;
     }
 
@@ -1842,14 +1930,19 @@ void render_mnemonic_full_review() {
                 18
             );
 
-        if (word != nullptr) {
-            lv_obj_align(
-                word,
-                LV_ALIGN_TOP_LEFT,
-                word_x,
-                y
+        if (word == nullptr) {
+            latch_ui_fault(
+                SeedUiFault::InvalidSeedResult
             );
+            return;
         }
+
+        lv_obj_align(
+            word,
+            LV_ALIGN_TOP_LEFT,
+            word_x,
+            y
+        );
     }
 
     lv_obj_t* finish =
@@ -1980,8 +2073,16 @@ void seed_ui_init(
     SeedAppController& app
 ) {
     reset_sensitive_ui_state();
+
+    g_ui_fault =
+        SeedUiFault::None;
+
     g_app = &app;
     seed_ui_render();
+}
+
+SeedUiFault seed_ui_fault() {
+    return g_ui_fault;
 }
 
 void seed_ui_render() {
@@ -2037,9 +2138,8 @@ void seed_ui_render() {
         default:
             prepare_screen();
 
-            create_header(
-                "CryptoMachine Seed",
-                "UI state not implemented yet."
+            latch_ui_fault(
+                SeedUiFault::UnexpectedApplicationState
             );
 
             break;

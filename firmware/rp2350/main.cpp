@@ -22,13 +22,10 @@ const char* touch_status_name(
     switch (status) {
         case TouchStatus::Success:
             return "success";
-
         case TouchStatus::NoTouch:
             return "no touch";
-
         case TouchStatus::InvalidChipId:
             return "invalid chip id";
-
         case TouchStatus::I2cError:
             return "i2c error";
     }
@@ -36,11 +33,43 @@ const char* touch_status_name(
     return "unknown";
 }
 
+const char* lvgl_fault_name(
+    cryptomachine::ui::LvglPortFault fault
+) {
+    using cryptomachine::ui::LvglPortFault;
+
+    switch (fault) {
+        case LvglPortFault::None:
+            return "none";
+        case LvglPortFault::TouchControllerError:
+            return "touch controller runtime error";
+    }
+
+    return "unknown LVGL runtime error";
+}
+
+const char* seed_ui_fault_name(
+    cryptomachine::ui::SeedUiFault fault
+) {
+    using cryptomachine::ui::SeedUiFault;
+
+    switch (fault) {
+        case SeedUiFault::None:
+            return "none";
+        case SeedUiFault::ControllerActionError:
+            return "controller action error";
+        case SeedUiFault::InvalidSeedResult:
+            return "invalid mnemonic application state";
+        case SeedUiFault::UnexpectedApplicationState:
+            return "unexpected application state";
+    }
+
+    return "unknown application error";
+}
+
 [[noreturn]] void halt_startup(
     const char* message
 ) {
-    // Never leave a dead or partially initialized product UI
-    // illuminated after a startup failure.
     cryptomachine::hardware::set_backlight_percent(0);
 
     std::printf(
@@ -57,39 +86,23 @@ const char* touch_status_name(
 
 [[noreturn]] void halt_runtime_fault(
     cryptomachine::SeedAppController& app,
-    cryptomachine::ui::LvglPortFault fault
+    const char* fault_name
 ) {
-    // Hide the panel immediately. Any mnemonic pixels still
-    // present in LCD GRAM are no longer visible while cleanup
-    // proceeds.
     cryptomachine::hardware::set_backlight_percent(0);
 
-    // Core wipe is unconditional and does not depend on the
-    // touchscreen or current UI state being trustworthy.
     app.emergency_destroy_session();
-
-    // Remove UI-side secret references and fixed input buffers.
     cryptomachine::ui::seed_ui_emergency_clear();
-
-    // Scrub rendered mnemonic pixels from RP2350 RAM.
     cryptomachine::ui::lvgl_port_wipe_draw_buffer();
 
-    // Remove any old sensitive image from the LCD controller's
-    // own display memory as well.
     cryptomachine::hardware::display_fill(0x0000);
 
     cryptomachine::ui::lvgl_port_wipe_draw_buffer();
 
-    const char* fault_name =
-        fault ==
-            cryptomachine::ui::
-                LvglPortFault::TouchControllerError
-            ? "touch controller runtime error"
-            : "unknown runtime error";
-
     std::printf(
         "RUNTIME FAULT: %s\n",
-        fault_name
+        fault_name != nullptr
+            ? fault_name
+            : "unknown runtime error"
     );
 
     std::printf(
@@ -112,8 +125,6 @@ int main() {
     const BoardBusRates bus_rates =
         board_init(kInitialLcdSpiHz);
 
-    // board_init() already configures the PWM backlight at 0%.
-    // Keep the intent explicit at the application boundary too.
     set_backlight_percent(0);
 
     stdio_init_all();
@@ -132,17 +143,9 @@ int main() {
         );
     }
 
-    std::printf(
-        "SeedAppController ready.\n"
-    );
-
-    std::printf(
-        "Board: Waveshare RP2350-Touch-LCD-3.5\n"
-    );
-
-    std::printf(
-        "MCU package: RP2350B\n"
-    );
+    std::printf("SeedAppController ready.\n");
+    std::printf("Board: Waveshare RP2350-Touch-LCD-3.5\n");
+    std::printf("MCU package: RP2350B\n");
 
     std::printf(
         "LCD SPI requested: %lu Hz\n",
@@ -165,37 +168,23 @@ int main() {
         )
     );
 
-    std::printf(
-        "Initializing ST7796 display...\n"
-    );
+    std::printf("Initializing ST7796 display...\n");
 
-    if (
-        !display_init(
-            DisplayOrientation::Portrait
-        )
-    ) {
+    if (!display_init(DisplayOrientation::Portrait)) {
         halt_startup(
             "Display initialization failed."
         );
     }
 
-    // Establish a known visual state before any UI becomes
-    // visible. The backlight remains off at this point.
     display_fill(0x0000);
 
     std::printf(
         "Display initialized: %u x %u\n",
-        static_cast<unsigned int>(
-            display_width()
-        ),
-        static_cast<unsigned int>(
-            display_height()
-        )
+        static_cast<unsigned int>(display_width()),
+        static_cast<unsigned int>(display_height())
     );
 
-    std::printf(
-        "Initializing FT6336U touch...\n"
-    );
+    std::printf("Initializing FT6336U touch...\n");
 
     const TouchStatus touch_status =
         touch_init();
@@ -205,22 +194,15 @@ int main() {
         touch_status_name(touch_status)
     );
 
-    if (
-        touch_status !=
-        TouchStatus::Success
-    ) {
+    if (touch_status != TouchStatus::Success) {
         halt_startup(
             "Touch initialization failed."
         );
     }
 
-    std::printf(
-        "Initializing LVGL...\n"
-    );
+    std::printf("Initializing LVGL...\n");
 
-    if (
-        !cryptomachine::ui::lvgl_port_init()
-    ) {
+    if (!cryptomachine::ui::lvgl_port_init()) {
         halt_startup(
             "LVGL initialization failed."
         );
@@ -228,26 +210,47 @@ int main() {
 
     cryptomachine::ui::seed_ui_init(app);
 
-    // Illuminate the display only after the controller,
-    // display, touch, LVGL port, and product UI have all
-    // initialized successfully.
+    const auto initial_ui_fault =
+        cryptomachine::ui::seed_ui_fault();
+
+    if (
+        initial_ui_fault !=
+        cryptomachine::ui::SeedUiFault::None
+    ) {
+        halt_runtime_fault(
+            app,
+            seed_ui_fault_name(initial_ui_fault)
+        );
+    }
+
     set_backlight_percent(50);
 
-    std::printf(
-        "CryptoMachine Seed UI ready.\n"
-    );
+    std::printf("CryptoMachine Seed UI ready.\n");
 
     while (true) {
-        const auto runtime_fault =
+        const auto port_fault =
             cryptomachine::ui::lvgl_port_process();
 
         if (
-            runtime_fault !=
+            port_fault !=
             cryptomachine::ui::LvglPortFault::None
         ) {
             halt_runtime_fault(
                 app,
-                runtime_fault
+                lvgl_fault_name(port_fault)
+            );
+        }
+
+        const auto ui_fault =
+            cryptomachine::ui::seed_ui_fault();
+
+        if (
+            ui_fault !=
+            cryptomachine::ui::SeedUiFault::None
+        ) {
+            halt_runtime_fault(
+                app,
+                seed_ui_fault_name(ui_fault)
             );
         }
 
