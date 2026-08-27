@@ -37,18 +37,23 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 pico_sdk_init()
 
+add_subdirectory(third_party/lvgl)
+
 add_executable(
     cryptomachine_seed
     main.cpp
     hardware/board_init.cpp
     hardware/display_st7796.cpp
     hardware/touch_ft6336u.cpp
+    ui/lvgl_port.cpp
+    ui/bringup_screen.cpp
 )
 
 target_include_directories(
     cryptomachine_seed
     PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/hardware
+        ${CMAKE_CURRENT_LIST_DIR}/ui
 )
 
 target_link_libraries(
@@ -61,6 +66,7 @@ target_link_libraries(
         hardware_pwm
         hardware_clocks
         hardware_vreg
+        cryptomachine_lvgl
 )
 
 pico_enable_stdio_usb(

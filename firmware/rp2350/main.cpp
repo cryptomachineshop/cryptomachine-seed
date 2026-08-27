@@ -1,5 +1,7 @@
 #include "board_init.h"
+#include "bringup_screen.h"
 #include "display_st7796.h"
+#include "lvgl_port.h"
 #include "touch_ft6336u.h"
 
 #include "pico/stdlib.h"
@@ -41,7 +43,6 @@ int main() {
     const BoardBusRates bus_rates =
         board_init(kInitialLcdSpiHz);
 
-    // Initialize USB stdio after the final board clocks are configured.
     stdio_init_all();
     sleep_ms(1500);
 
@@ -75,7 +76,6 @@ int main() {
     }
 
     display_fill(0x0000);
-    set_backlight_percent(50);
 
     std::printf(
         "Display initialized: %u x %u\n",
@@ -92,29 +92,26 @@ int main() {
         touch_status_name(touch_status)
     );
 
-    std::uint32_t heartbeat = 0;
+    std::printf("Initializing LVGL...\n");
+
+    if (!cryptomachine::ui::lvgl_port_init()) {
+        std::printf("LVGL initialization failed.\n");
+
+        while (true) {
+            sleep_ms(1000);
+        }
+    }
+
+    cryptomachine::ui::create_bringup_screen();
+
+    // Illuminate the display only after the controller and UI
+    // have been initialized.
+    set_backlight_percent(50);
+
+    std::printf("LVGL bring-up screen ready.\n");
 
     while (true) {
-        std::printf(
-            "heartbeat %lu\n",
-            static_cast<unsigned long>(heartbeat++)
-        );
-
-        if (touch_status == TouchStatus::Success) {
-            TouchPoint point{};
-
-            const TouchStatus read_status =
-                touch_read(point);
-
-            if (read_status == TouchStatus::Success) {
-                std::printf(
-                    "touch x=%u y=%u\n",
-                    static_cast<unsigned int>(point.x),
-                    static_cast<unsigned int>(point.y)
-                );
-            }
-        }
-
-        sleep_ms(2000);
+        cryptomachine::ui::lvgl_port_process();
+        sleep_ms(5);
     }
 }

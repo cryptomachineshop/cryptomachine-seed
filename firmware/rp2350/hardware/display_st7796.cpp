@@ -263,6 +263,26 @@ void display_write_pixels(
     deselect_display();
 }
 
+void display_write_bytes(
+    const std::uint8_t* data,
+    std::size_t byte_count
+) {
+    if (data == nullptr || byte_count == 0) {
+        return;
+    }
+
+    gpio_put(kLcdDataCommandPin, 1);
+    select_display();
+
+    spi_write_blocking(
+        spi0,
+        data,
+        byte_count
+    );
+
+    deselect_display();
+}
+
 void display_fill(std::uint16_t color) {
     if (!display_set_window(0, 0, g_width, g_height)) {
         return;

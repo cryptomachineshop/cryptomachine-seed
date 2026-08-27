@@ -40,6 +40,15 @@ void display_write_pixels(
     std::size_t pixel_count
 );
 
+// Write bytes exactly as supplied.
+//
+// Intended for display pipelines such as LVGL where RGB565 byte ordering
+// has already been prepared by the renderer.
+void display_write_bytes(
+    const std::uint8_t* data,
+    std::size_t byte_count
+);
+
 // Fill the entire display with one RGB565 color.
 void display_fill(std::uint16_t color);
 
