@@ -6,14 +6,17 @@ class SeedAppController;
 
 namespace ui {
 
-// Initializes the production CryptoMachine Seed LVGL interface
-// and renders the controller's current application state.
 void seed_ui_init(
     SeedAppController& app
 );
 
-// Re-renders the screen from the controller's current state.
 void seed_ui_render();
+
+// Critical-fault cleanup only. Scrubs UI-side secret state,
+// removes secret-dependent LVGL label references, and deletes
+// the active screen's child objects without navigating through
+// the normal product workflow.
+void seed_ui_emergency_clear();
 
 }  // namespace ui
 }  // namespace cryptomachine

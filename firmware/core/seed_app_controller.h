@@ -184,6 +184,14 @@ public:
     // Then returns the UI to Home.
     SeedAppStatus destroy_session();
 
+    // Emergency path for critical runtime faults.
+    // This is intentionally unconditional and does not
+    // require SessionDestroyConfirm or any other UI state.
+    //
+    // Securely wipes all controller-owned sensitive session
+    // material and resets application state to Home.
+    void emergency_destroy_session();
+
 private:
     void wipe_pending_shake();
 

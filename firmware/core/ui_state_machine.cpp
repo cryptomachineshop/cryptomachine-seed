@@ -536,4 +536,9 @@ UIStateMachine::leave_sensitive_workflow_to_home() {
     return UIActionStatus::Success;
 }
 
+void UIStateMachine::emergency_reset_to_home() {
+    clear_sensitive_session();
+    set_state(UIState::Home);
+}
+
 }  // namespace cryptomachine

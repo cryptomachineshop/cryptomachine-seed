@@ -425,11 +425,246 @@ void test_warning_route_and_restart() {
     );
 }
 
+void complete_known_12_word_dice(
+    cryptomachine::SeedAppController& app
+) {
+    constexpr std::string_view dice =
+        "65515223131652132161133154444123616466443112153441";
+
+    check(
+        app.boot_complete() ==
+            cryptomachine::SeedAppStatus::Success,
+        "emergency helper boot must succeed"
+    );
+
+    check(
+        app.open_create_from_dice() ==
+            cryptomachine::SeedAppStatus::Success,
+        "emergency helper must open dice flow"
+    );
+
+    check(
+        app.choose_dice_word_count(12) ==
+            cryptomachine::SeedAppStatus::Success,
+        "emergency helper must initialize 12-word ceremony"
+    );
+
+    check(
+        app.begin_dice_entry() ==
+            cryptomachine::SeedAppStatus::Success,
+        "emergency helper must begin dice entry"
+    );
+
+    for (
+        std::size_t offset = 0;
+        offset < dice.size();
+        offset += cryptomachine::kDiceCount
+    ) {
+        const std::string_view shake =
+            dice.substr(
+                offset,
+                cryptomachine::kDiceCount
+            );
+
+        check(
+            app.enter_shake_for_review(shake) ==
+                cryptomachine::SeedAppStatus::Success,
+            "emergency helper shake must enter review"
+        );
+
+        check(
+            app.confirm_pending_shake() ==
+                cryptomachine::SeedAppStatus::Success,
+            "emergency helper shake must commit"
+        );
+    }
+}
+
+void test_emergency_destroy_pending_shake() {
+    cryptomachine::SeedAppController app;
+
+    app.boot_complete();
+    app.open_create_from_dice();
+    app.choose_dice_word_count(12);
+    app.begin_dice_entry();
+
+    check(
+        app.enter_shake_for_review("12345") ==
+            cryptomachine::SeedAppStatus::Success,
+        "emergency test must create pending shake"
+    );
+
+    check(
+        app.has_pending_shake(),
+        "pending shake must exist before emergency wipe"
+    );
+
+    check(
+        app.sensitive_data_present(),
+        "pending-shake workflow must be sensitive"
+    );
+
+    app.emergency_destroy_session();
+
+    check(
+        app.state() == cryptomachine::UIState::Home,
+        "emergency wipe must return controller Home"
+    );
+
+    check(
+        app.word_count() == 0,
+        "emergency wipe must clear selected word count"
+    );
+
+    check(
+        !app.has_pending_shake(),
+        "emergency wipe must clear pending shake"
+    );
+
+    check(
+        app.pending_shake().empty(),
+        "emergency wipe must expose no pending shake"
+    );
+
+    check(
+        app.shake_count() == 0,
+        "emergency wipe must clear dice history"
+    );
+
+    check(
+        app.seed_result() == nullptr,
+        "emergency wipe must expose no seed result"
+    );
+
+    check(
+        !app.sanity_report_ready(),
+        "emergency wipe must clear sanity state"
+    );
+
+    check(
+        app.sanity_report() == nullptr,
+        "emergency wipe must expose no sanity report"
+    );
+
+    check(
+        !app.generated(),
+        "emergency wipe must clear generated state"
+    );
+
+    check(
+        !app.sensitive_data_present(),
+        "emergency wipe must clear sensitive-data state"
+    );
+}
+
+void test_emergency_destroy_generated_session() {
+    cryptomachine::SeedAppController app;
+
+    complete_known_12_word_dice(app);
+
+    check(
+        app.state() ==
+            cryptomachine::UIState::DiceComplete,
+        "emergency generated test must reach DiceComplete"
+    );
+
+    check(
+        app.shake_count() == 10,
+        "dice history must exist before emergency wipe"
+    );
+
+    check(
+        app.sanity_report_ready(),
+        "sanity report must exist before emergency wipe"
+    );
+
+    check(
+        app.sanity_report() != nullptr,
+        "sanity report must be accessible before emergency wipe"
+    );
+
+    check(
+        app.continue_from_dice_complete() ==
+            cryptomachine::SeedAppStatus::Success,
+        "emergency generated test must reach generation confirmation"
+    );
+
+    check(
+        app.generate_mnemonic() ==
+            cryptomachine::SeedAppStatus::Success,
+        "emergency generated test must generate mnemonic"
+    );
+
+    check(
+        app.seed_result() != nullptr,
+        "generated result must exist before emergency wipe"
+    );
+
+    check(
+        app.generated(),
+        "generated state must be true before emergency wipe"
+    );
+
+    app.emergency_destroy_session();
+
+    check(
+        app.state() == cryptomachine::UIState::Home,
+        "generated emergency wipe must return Home"
+    );
+
+    check(
+        app.word_count() == 0,
+        "generated emergency wipe must clear word count"
+    );
+
+    check(
+        app.shake_count() == 0,
+        "generated emergency wipe must clear dice history"
+    );
+
+    check(
+        !app.ceremony_complete(),
+        "generated emergency wipe must clear completion state"
+    );
+
+    check(
+        app.seed_result() == nullptr,
+        "generated emergency wipe must remove mnemonic result"
+    );
+
+    check(
+        !app.generated(),
+        "generated emergency wipe must clear generated state"
+    );
+
+    check(
+        !app.sanity_report_ready(),
+        "generated emergency wipe must clear sanity state"
+    );
+
+    check(
+        app.sanity_report() == nullptr,
+        "generated emergency wipe must expose no sanity report"
+    );
+
+    check(
+        !app.has_pending_shake(),
+        "generated emergency wipe must clear pending shake"
+    );
+
+    check(
+        !app.sensitive_data_present(),
+        "generated emergency wipe must clear sensitive-data state"
+    );
+}
+
 }  // namespace
 
 int main() {
     test_real_12_word_workflow();
     test_warning_route_and_restart();
+    test_emergency_destroy_pending_shake();
+    test_emergency_destroy_generated_session();
 
     if (failures != 0) {
         std::cerr

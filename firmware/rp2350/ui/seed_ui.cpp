@@ -1964,6 +1964,18 @@ void render_session_destroy_confirm() {
 }
 }  // namespace
 
+void seed_ui_emergency_clear() {
+    clear_sensitive_word_label_refs();
+    wipe_dice_entry();
+    g_mnemonic_word_index = 0;
+
+    lv_obj_t* screen = lv_scr_act();
+
+    if (screen != nullptr) {
+        lv_obj_clean(screen);
+    }
+}
+
 void seed_ui_init(
     SeedAppController& app
 ) {

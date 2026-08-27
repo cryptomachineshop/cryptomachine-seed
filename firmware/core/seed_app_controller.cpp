@@ -479,6 +479,16 @@ SeedAppStatus SeedAppController::destroy_session() {
     );
 }
 
+void SeedAppController::emergency_destroy_session() {
+    // Do not consult UI state here. A critical hardware/runtime
+    // fault may mean the normal UI flow can no longer be trusted.
+    wipe_pending_shake();
+    wipe_sanity_report();
+
+    ceremony_.destroy_session();
+    ui_.emergency_reset_to_home();
+}
+
 void SeedAppController::wipe_pending_shake() {
     secure_zero(
         pending_shake_.data(),

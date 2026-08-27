@@ -154,6 +154,11 @@ public:
 
     UIActionStatus leave_sensitive_workflow_to_home();
 
+    // Unconditional reset used only after a critical runtime
+    // fault has already required the surrounding application
+    // to destroy all sensitive material.
+    void emergency_reset_to_home();
+
 private:
     bool require_state(
         UIState allowed

@@ -32,6 +32,9 @@ cryptomachine::hardware::TouchPoint g_last_touch{};
 
 bool g_initialized = false;
 
+LvglPortFault g_runtime_fault =
+    LvglPortFault::None;
+
 bool tick_callback(repeating_timer*) {
     lv_tick_inc(5);
     return true;
@@ -152,6 +155,29 @@ void touch_read_callback(
         return;
     }
 
+    // Once a critical input fault is latched, never touch the
+    // I2C controller again. Report PRESSED rather than RELEASED
+    // so LVGL cannot synthesize a click from a failed read.
+    if (
+        g_runtime_fault !=
+        LvglPortFault::None
+    ) {
+        data->point.x =
+            static_cast<lv_coord_t>(
+                g_last_touch.x
+            );
+
+        data->point.y =
+            static_cast<lv_coord_t>(
+                g_last_touch.y
+            );
+
+        data->state =
+            LV_INDEV_STATE_PRESSED;
+
+        return;
+    }
+
     cryptomachine::hardware::TouchPoint point{};
 
     const auto status =
@@ -191,8 +217,27 @@ void touch_read_callback(
             g_last_touch.y
         );
 
+    if (
+        status ==
+        cryptomachine::hardware::TouchStatus::NoTouch
+    ) {
+        // Normal inactivity. Preserve the current ceremony.
+        data->state =
+            LV_INDEV_STATE_RELEASED;
+
+        return;
+    }
+
+    // Any actual touch-controller communication/state failure
+    // is fatal to the current appliance session. Keep the
+    // input logically pressed so a failed read cannot become
+    // an accidental CLICKED event before main() handles the
+    // latched fault.
+    g_runtime_fault =
+        LvglPortFault::TouchControllerError;
+
     data->state =
-        LV_INDEV_STATE_RELEASED;
+        LV_INDEV_STATE_PRESSED;
 }
 
 }  // namespace
@@ -201,6 +246,9 @@ bool lvgl_port_init() {
     if (g_initialized) {
         return true;
     }
+
+    g_runtime_fault =
+        LvglPortFault::None;
 
     static_assert(
         sizeof(lv_color_t) == 2,
@@ -302,12 +350,14 @@ bool lvgl_port_init() {
     return true;
 }
 
-void lvgl_port_process() {
+LvglPortFault lvgl_port_process() {
     if (!g_initialized) {
-        return;
+        return LvglPortFault::None;
     }
 
     lv_timer_handler();
+
+    return g_runtime_fault;
 }
 
 void lvgl_port_wipe_draw_buffer() {
