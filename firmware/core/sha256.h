@@ -3,7 +3,6 @@
 #include <array>
 #include <cstdint>
 #include <span>
-#include <string>
 #include <string_view>
 
 namespace cryptomachine {
@@ -18,8 +17,5 @@ Sha256Digest sha256(
     std::string_view text
 );
 
-std::string sha256_hex(
-    const Sha256Digest& digest
-);
 
 }  // namespace cryptomachine

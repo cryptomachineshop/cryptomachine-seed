@@ -89,38 +89,5 @@ bool bip39_entropy_to_mnemonic(
     return true;
 }
 
-std::string bip39_mnemonic_to_string(
-    const Bip39Mnemonic& mnemonic,
-    std::span<const std::string_view> wordlist
-) {
-    if (wordlist.size() != kBip39WordlistSize) {
-        return {};
-    }
-
-    if (
-        mnemonic.word_count == 0 ||
-        mnemonic.word_count > kBip39MaxWords
-    ) {
-        return {};
-    }
-
-    std::string result;
-
-    for (std::size_t i = 0; i < mnemonic.word_count; ++i) {
-        const std::uint16_t index = mnemonic.word_indices[i];
-
-        if (index >= kBip39WordlistSize) {
-            return {};
-        }
-
-        if (!result.empty()) {
-            result.push_back(' ');
-        }
-
-        result.append(wordlist[index]);
-    }
-
-    return result;
-}
 
 }  // namespace cryptomachine

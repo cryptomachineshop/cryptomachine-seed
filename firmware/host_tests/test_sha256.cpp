@@ -1,3 +1,4 @@
+#include "test_format_helpers.h"
 #include "sha256.h"
 
 #include <cassert>

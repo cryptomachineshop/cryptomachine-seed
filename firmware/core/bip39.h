@@ -4,7 +4,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
-#include <string>
 #include <string_view>
 
 namespace cryptomachine {
@@ -35,9 +34,5 @@ bool bip39_entropy_to_mnemonic(
 // Resolves a mnemonic's 0-based indexes against a 2048-word BIP39 list.
 // Returns an empty string if the word list is not exactly 2048 entries
 // or if the mnemonic structure contains an invalid index/count.
-std::string bip39_mnemonic_to_string(
-    const Bip39Mnemonic& mnemonic,
-    std::span<const std::string_view> wordlist
-);
 
 }  // namespace cryptomachine

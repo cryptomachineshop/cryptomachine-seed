@@ -1,3 +1,4 @@
+#include "test_format_helpers.h"
 #include "bip39.h"
 #include "bip39_wordlist.h"
 

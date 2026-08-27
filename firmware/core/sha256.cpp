@@ -267,31 +267,5 @@ Sha256Digest sha256(
     );
 }
 
-std::string sha256_hex(
-    const Sha256Digest& digest
-) {
-    static constexpr char kHex[] =
-        "0123456789abcdef";
-
-    std::string result;
-    result.resize(64);
-
-    for (
-        std::size_t index = 0;
-        index < digest.size();
-        ++index
-    ) {
-        const std::uint8_t value =
-            digest[index];
-
-        result[index * 2] =
-            kHex[value >> 4U];
-
-        result[index * 2 + 1] =
-            kHex[value & 0x0FU];
-    }
-
-    return result;
-}
 
 }  // namespace cryptomachine
