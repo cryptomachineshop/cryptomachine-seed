@@ -35,6 +35,10 @@ bool g_initialized = false;
 LvglPortFault g_runtime_fault =
     LvglPortFault::None;
 
+bool g_touch_activity = false;
+bool g_wake_guard_armed = false;
+bool g_suppress_until_release = false;
+
 bool tick_callback(repeating_timer*) {
     lv_tick_inc(5);
     return true;
@@ -190,6 +194,7 @@ void touch_read_callback(
         cryptomachine::hardware::TouchStatus::Success
     ) {
         g_last_touch = point;
+        g_touch_activity = true;
 
         data->point.x =
             static_cast<lv_coord_t>(
@@ -201,8 +206,18 @@ void touch_read_callback(
                 point.y
             );
 
+        if (g_wake_guard_armed) {
+            // Consume the first real touch as wake-only.
+            // Keep suppressing until physical release so a
+            // held finger cannot turn into a CLICKED event.
+            g_wake_guard_armed = false;
+            g_suppress_until_release = true;
+        }
+
         data->state =
-            LV_INDEV_STATE_PRESSED;
+            g_suppress_until_release
+                ? LV_INDEV_STATE_RELEASED
+                : LV_INDEV_STATE_PRESSED;
 
         return;
     }
@@ -224,6 +239,12 @@ void touch_read_callback(
         // Normal inactivity. Preserve the current ceremony.
         data->state =
             LV_INDEV_STATE_RELEASED;
+
+        if (g_suppress_until_release) {
+            // The wake touch has now been physically released.
+            // The next touch may interact with the restored UI.
+            g_suppress_until_release = false;
+        }
 
         return;
     }
@@ -249,6 +270,10 @@ bool lvgl_port_init() {
 
     g_runtime_fault =
         LvglPortFault::None;
+
+    g_touch_activity = false;
+    g_wake_guard_armed = false;
+    g_suppress_until_release = false;
 
     static_assert(
         sizeof(lv_color_t) == 2,
@@ -358,6 +383,24 @@ LvglPortFault lvgl_port_process() {
     lv_timer_handler();
 
     return g_runtime_fault;
+}
+
+bool lvgl_port_consume_touch_activity() {
+    const bool activity =
+        g_touch_activity;
+
+    g_touch_activity = false;
+
+    return activity;
+}
+
+void lvgl_port_arm_wake_guard() {
+    g_wake_guard_armed = true;
+}
+
+void lvgl_port_cancel_wake_guard() {
+    g_wake_guard_armed = false;
+    g_suppress_until_release = false;
 }
 
 void lvgl_port_wipe_draw_buffer() {

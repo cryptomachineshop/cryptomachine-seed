@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 namespace cryptomachine {
 
 class SeedAppController;
@@ -19,15 +21,23 @@ void seed_ui_init(
 
 void seed_ui_render();
 
+// Replaces the current ceremony view with a generic inactivity
+// warning without modifying controller state or UI-side partial
+// dice entry. Calling seed_ui_render() restores the exact
+// ceremony state after a wake touch.
+void seed_ui_show_inactivity_warning(
+    std::uint32_t remaining_seconds
+);
+
 // Returns the first latched UI/application fault. Faults remain
 // latched until reboot; main() consumes them and performs the
 // unconditional emergency-destruction path.
 SeedUiFault seed_ui_fault();
 
-// Critical-fault cleanup only. Scrubs UI-side secret state,
-// removes secret-dependent LVGL label references, and deletes
-// the active screen's child objects without navigating through
-// the normal product workflow.
+// Critical-fault/forced-destruction cleanup. Scrubs UI-side
+// secret state, removes secret-dependent LVGL label references,
+// and deletes the active screen's child objects without
+// navigating through the normal product workflow.
 void seed_ui_emergency_clear();
 
 }  // namespace ui

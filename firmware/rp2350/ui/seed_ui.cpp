@@ -2055,6 +2055,10 @@ void render_session_destroy_confirm() {
         nullptr
     );
 }
+
+lv_obj_t* g_inactivity_countdown_label = nullptr;
+bool g_inactivity_warning_visible = false;
+
 }  // namespace
 
 void seed_ui_emergency_clear() {
@@ -2062,11 +2066,155 @@ void seed_ui_emergency_clear() {
     wipe_dice_entry();
     g_mnemonic_word_index = 0;
 
+    g_inactivity_countdown_label = nullptr;
+    g_inactivity_warning_visible = false;
+
     lv_obj_t* screen = lv_scr_act();
 
     if (screen != nullptr) {
         lv_obj_clean(screen);
     }
+}
+
+void seed_ui_show_inactivity_warning(
+    std::uint32_t remaining_seconds
+) {
+    lv_obj_t* screen = lv_scr_act();
+
+    if (screen == nullptr) {
+        latch_ui_fault(
+            SeedUiFault::UnexpectedApplicationState
+        );
+        return;
+    }
+
+    if (!g_inactivity_warning_visible) {
+        // Mnemonic labels use static dictionary pointers. Switch
+        // those labels away from their selected word before the
+        // screen objects are deleted.
+        clear_sensitive_word_label_refs();
+
+        lv_obj_clean(screen);
+
+        lv_obj_set_style_bg_color(
+            screen,
+            lv_color_hex(0x0C0C0C),
+            LV_PART_MAIN
+        );
+
+        lv_obj_set_style_bg_opa(
+            screen,
+            LV_OPA_COVER,
+            LV_PART_MAIN
+        );
+
+        lv_obj_t* title =
+            lv_label_create(screen);
+
+        lv_obj_t* body =
+            lv_label_create(screen);
+
+        g_inactivity_countdown_label =
+            lv_label_create(screen);
+
+        if (
+            title == nullptr ||
+            body == nullptr ||
+            g_inactivity_countdown_label == nullptr
+        ) {
+            g_inactivity_countdown_label = nullptr;
+            g_inactivity_warning_visible = false;
+
+            latch_ui_fault(
+                SeedUiFault::UnexpectedApplicationState
+            );
+            return;
+        }
+
+        lv_label_set_text(
+            title,
+            "SESSION IDLE"
+        );
+
+        lv_obj_set_style_text_color(
+            title,
+            lv_color_hex(0xFFFFFF),
+            LV_PART_MAIN
+        );
+
+        lv_obj_align(
+            title,
+            LV_ALIGN_TOP_MID,
+            0,
+            105
+        );
+
+        lv_label_set_text(
+            body,
+            "Touch the screen to resume.\n"
+            "If left idle, the current seed\n"
+            "ceremony will be securely wiped."
+        );
+
+        lv_label_set_long_mode(
+            body,
+            LV_LABEL_LONG_WRAP
+        );
+
+        lv_obj_set_width(
+            body,
+            280
+        );
+
+        lv_obj_set_style_text_align(
+            body,
+            LV_TEXT_ALIGN_CENTER,
+            LV_PART_MAIN
+        );
+
+        lv_obj_set_style_text_color(
+            body,
+            lv_color_hex(0xBDBDBD),
+            LV_PART_MAIN
+        );
+
+        lv_obj_align(
+            body,
+            LV_ALIGN_CENTER,
+            0,
+            -10
+        );
+
+        lv_obj_set_style_text_color(
+            g_inactivity_countdown_label,
+            lv_color_hex(0xFFFFFF),
+            LV_PART_MAIN
+        );
+
+        lv_obj_align(
+            g_inactivity_countdown_label,
+            LV_ALIGN_CENTER,
+            0,
+            82
+        );
+
+        g_inactivity_warning_visible = true;
+    }
+
+    if (g_inactivity_countdown_label == nullptr) {
+        latch_ui_fault(
+            SeedUiFault::UnexpectedApplicationState
+        );
+        return;
+    }
+
+    lv_label_set_text_fmt(
+        g_inactivity_countdown_label,
+        "Wiping in %lu seconds",
+        static_cast<unsigned long>(
+            remaining_seconds
+        )
+    );
 }
 
 void seed_ui_init(
@@ -2086,7 +2234,13 @@ SeedUiFault seed_ui_fault() {
 }
 
 void seed_ui_render() {
+    g_inactivity_countdown_label = nullptr;
+    g_inactivity_warning_visible = false;
+
     if (g_app == nullptr) {
+        latch_ui_fault(
+            SeedUiFault::UnexpectedApplicationState
+        );
         return;
     }
 
