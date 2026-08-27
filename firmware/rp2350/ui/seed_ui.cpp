@@ -1,15 +1,30 @@
 #include "seed_ui.h"
 
 #include "seed_app_controller.h"
+#include "secure_zero.h"
 #include "lvgl.h"
 
+#include <array>
 #include <cstddef>
+#include <string_view>
 
 namespace cryptomachine::ui {
 
 namespace {
 
 SeedAppController* g_app = nullptr;
+
+std::array<char, kDiceCount> g_dice_entry{};
+std::size_t g_dice_entry_count = 0;
+
+void wipe_dice_entry() {
+    secure_zero(
+        g_dice_entry.data(),
+        g_dice_entry.size()
+    );
+
+    g_dice_entry_count = 0;
+}
 
 constexpr lv_color_t kBackground =
     LV_COLOR_MAKE(0x11, 0x11, 0x11);
@@ -231,9 +246,33 @@ void create_header(
     );
 }
 
+void begin_dice_entry_event(
+    lv_event_t* event
+) {
+    if (
+        lv_event_get_code(event) !=
+        LV_EVENT_CLICKED
+    ) {
+        return;
+    }
+
+    if (g_app == nullptr) {
+        return;
+    }
+
+    if (
+        g_app->begin_dice_entry() ==
+        SeedAppStatus::Success
+    ) {
+        seed_ui_render();
+    }
+}
+
 void render_home();
 void render_word_count();
 void render_dice_intro();
+void render_dice_entry();
+void render_dice_shake_review();
 
 void create_from_dice_event(
     lv_event_t* event
@@ -512,6 +551,29 @@ void render_dice_intro() {
         85
     );
 
+    lv_obj_t* begin =
+        make_button(
+            "BEGIN DICE ENTRY",
+            250,
+            70,
+            kOrange,
+            kBackground
+        );
+
+    lv_obj_align(
+        begin,
+        LV_ALIGN_CENTER,
+        0,
+        145
+    );
+
+    lv_obj_add_event_cb(
+        begin,
+        begin_dice_entry_event,
+        LV_EVENT_CLICKED,
+        nullptr
+    );
+
     lv_obj_t* footer =
         make_label(
             "Dice entry screen next",
@@ -524,6 +586,314 @@ void render_dice_intro() {
         LV_ALIGN_BOTTOM_MID,
         0,
         -28
+    );
+}
+
+void dice_face_event(
+    lv_event_t* event
+) {
+    if (
+        lv_event_get_code(event) !=
+        LV_EVENT_CLICKED
+    ) {
+        return;
+    }
+
+    if (
+        g_app == nullptr ||
+        g_dice_entry_count >= kDiceCount
+    ) {
+        return;
+    }
+
+    const char* face =
+        static_cast<const char*>(
+            lv_event_get_user_data(event)
+        );
+
+    if (
+        face == nullptr ||
+        face[0] < '1' ||
+        face[0] > '6'
+    ) {
+        return;
+    }
+
+    g_dice_entry[g_dice_entry_count] =
+        face[0];
+
+    ++g_dice_entry_count;
+
+    if (g_dice_entry_count == kDiceCount) {
+        const SeedAppStatus status =
+            g_app->enter_shake_for_review(
+                std::string_view(
+                    g_dice_entry.data(),
+                    g_dice_entry.size()
+                )
+            );
+
+        // The controller now owns its fixed copy.
+        // Wipe the UI-side entry buffer immediately.
+        wipe_dice_entry();
+
+        if (status == SeedAppStatus::Success) {
+            seed_ui_render();
+        }
+
+        return;
+    }
+
+    seed_ui_render();
+}
+
+void confirm_shake_event(
+    lv_event_t* event
+) {
+    if (
+        lv_event_get_code(event) !=
+        LV_EVENT_CLICKED
+    ) {
+        return;
+    }
+
+    if (g_app == nullptr) {
+        return;
+    }
+
+    wipe_dice_entry();
+
+    if (
+        g_app->confirm_pending_shake() ==
+        SeedAppStatus::Success
+    ) {
+        seed_ui_render();
+    }
+}
+
+void reenter_shake_event(
+    lv_event_t* event
+) {
+    if (
+        lv_event_get_code(event) !=
+        LV_EVENT_CLICKED
+    ) {
+        return;
+    }
+
+    if (g_app == nullptr) {
+        return;
+    }
+
+    wipe_dice_entry();
+
+    if (
+        g_app->reenter_pending_shake() ==
+        SeedAppStatus::Success
+    ) {
+        seed_ui_render();
+    }
+}
+
+void render_dice_entry() {
+    prepare_screen();
+
+    create_header(
+        "Dice Entry",
+        "Roll five dice and enter them "
+        "in fixed D1-D5 order."
+    );
+
+    static const char* const prompts[] = {
+        "Enter D1",
+        "Enter D2",
+        "Enter D3",
+        "Enter D4",
+        "Enter D5",
+        "Five dice entered"
+    };
+
+    static const char* const progress[] = {
+        "0 / 5 entered",
+        "1 / 5 entered",
+        "2 / 5 entered",
+        "3 / 5 entered",
+        "4 / 5 entered",
+        "5 / 5 entered"
+    };
+
+    const std::size_t index =
+        g_dice_entry_count <= kDiceCount
+            ? g_dice_entry_count
+            : kDiceCount;
+
+    lv_obj_t* prompt =
+        make_label(
+            prompts[index],
+            &lv_font_montserrat_24,
+            kOrange
+        );
+
+    lv_obj_align(
+        prompt,
+        LV_ALIGN_TOP_MID,
+        0,
+        205
+    );
+
+    lv_obj_t* progress_label =
+        make_label(
+            progress[index],
+            &lv_font_montserrat_14,
+            kMuted
+        );
+
+    lv_obj_align(
+        progress_label,
+        LV_ALIGN_TOP_MID,
+        0,
+        242
+    );
+
+    if (g_dice_entry_count < kDiceCount) {
+        static const char* const faces[] = {
+            "1", "2", "3", "4", "5", "6"
+        };
+
+        for (std::size_t i = 0; i < 6; ++i) {
+            lv_obj_t* button =
+                make_button(
+                    faces[i],
+                    78,
+                    62,
+                    kButtonDark,
+                    kWhite
+                );
+
+            const lv_coord_t x =
+                static_cast<lv_coord_t>(
+                    (i % 3) * 88 - 88
+                );
+
+            const lv_coord_t y =
+                static_cast<lv_coord_t>(
+                    (i / 3) * 74 + 305
+                );
+
+            lv_obj_align(
+                button,
+                LV_ALIGN_TOP_MID,
+                x,
+                y
+            );
+
+            lv_obj_add_event_cb(
+                button,
+                dice_face_event,
+                LV_EVENT_CLICKED,
+                const_cast<char*>(faces[i])
+            );
+        }
+    } else {
+        lv_obj_t* ready =
+            make_label(
+                "Ready for shake review",
+                &lv_font_montserrat_16,
+                kWhite
+            );
+
+        lv_obj_align(
+            ready,
+            LV_ALIGN_CENTER,
+            0,
+            140
+        );
+    }
+}
+
+void render_dice_shake_review() {
+    prepare_screen();
+
+    create_header(
+        "Review Shake",
+        "Five dice captured securely."
+    );
+
+    lv_obj_t* message =
+        make_label(
+            "Confirm this shake or "
+            "re-enter all five dice.",
+            &lv_font_montserrat_16,
+            kWhite
+        );
+
+    lv_obj_set_width(
+        message,
+        260
+    );
+
+    lv_label_set_long_mode(
+        message,
+        LV_LABEL_LONG_WRAP
+    );
+
+    lv_obj_set_style_text_align(
+        message,
+        LV_TEXT_ALIGN_CENTER,
+        0
+    );
+
+    lv_obj_align(
+        message,
+        LV_ALIGN_CENTER,
+        0,
+        -10
+    );
+
+    lv_obj_t* confirm =
+        make_button(
+            "CONFIRM SHAKE",
+            250,
+            70,
+            kOrange,
+            kBackground
+        );
+
+    lv_obj_align(
+        confirm,
+        LV_ALIGN_CENTER,
+        0,
+        80
+    );
+
+    lv_obj_add_event_cb(
+        confirm,
+        confirm_shake_event,
+        LV_EVENT_CLICKED,
+        nullptr
+    );
+
+    lv_obj_t* reenter =
+        make_button(
+            "RE-ENTER",
+            180,
+            54,
+            kButtonDark,
+            kWhite
+        );
+
+    lv_obj_align(
+        reenter,
+        LV_ALIGN_BOTTOM_MID,
+        0,
+        -24
+    );
+
+    lv_obj_add_event_cb(
+        reenter,
+        reenter_shake_event,
+        LV_EVENT_CLICKED,
+        nullptr
     );
 }
 
@@ -552,6 +922,14 @@ void seed_ui_render() {
 
         case UIState::DiceIntro:
             render_dice_intro();
+            break;
+
+        case UIState::DiceEntry:
+            render_dice_entry();
+            break;
+
+        case UIState::DiceShakeReview:
+            render_dice_shake_review();
             break;
 
         default:
