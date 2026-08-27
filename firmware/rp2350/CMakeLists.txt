@@ -52,6 +52,7 @@ add_executable(
     hardware/touch_ft6336u.cpp
     ui/lvgl_port.cpp
     ui/bringup_screen.cpp
+    ui/seed_ui.cpp
 )
 
 target_include_directories(
