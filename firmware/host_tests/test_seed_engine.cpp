@@ -31,26 +31,6 @@ std::string mnemonic_string(
     );
 }
 
-bool has_warning_containing(
-    const cryptomachine::FiveDiceSanity& sanity,
-    std::string_view text
-) {
-    for (
-        std::size_t i = 0;
-        i < sanity.warning_count;
-        ++i
-    ) {
-        if (
-            sanity.warnings[i].find(text)
-            != std::string::npos
-        ) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
 void test_12_word_seed() {
     constexpr std::string_view dice =
         "65515223131652132161133154444123616466443112153441";
@@ -79,20 +59,9 @@ void test_12_word_seed() {
     );
 
     check(
-        result.sanity.rolls_per_die == 10,
-        "12-word sanity must contain 10 rolls per die"
+        result.mnemonic.word_count == 12,
+        "12-word result must contain exactly 12 indexes"
     );
-
-    for (
-        std::size_t i = 0;
-        i < cryptomachine::kDiceCount;
-        ++i
-    ) {
-        check(
-            result.sanity.per_die[i].rolls == 10,
-            "each physical die must contain 10 rolls"
-        );
-    }
 }
 
 void test_24_word_seed() {
@@ -125,12 +94,16 @@ void test_24_word_seed() {
     );
 
     check(
-        result.sanity.rolls_per_die == 20,
-        "24-word sanity must contain 20 rolls per die"
+        result.mnemonic.word_count == 24,
+        "24-word result must contain exactly 24 indexes"
     );
 }
 
-void test_per_die_warning_reaches_seed_engine() {
+void test_warning_pattern_does_not_change_engine_contract() {
+    // D1 is intentionally stuck on face 6. The product controller's
+    // single pre-generation sanity pass warns about this pattern.
+    // The seed engine itself is deliberately limited to validated
+    // dice-to-mnemonic conversion and must remain deterministic.
     constexpr std::string_view dice =
         "61234"
         "62345"
@@ -154,20 +127,12 @@ void test_per_die_warning_reaches_seed_engine() {
 
     check(
         status == cryptomachine::SeedEngineStatus::Success,
-        "sanity warning must not block seed generation"
-    );
-
-    check(
-        has_warning_containing(
-            result.sanity,
-            "D1 produced the same face"
-        ),
-        "D1 sanity warning must reach seed engine result"
+        "valid dice values must remain generatable after sanity separation"
     );
 
     check(
         result.mnemonic.word_count == 12,
-        "sanity warning must not alter mnemonic generation"
+        "sanity separation must not alter mnemonic generation"
     );
 }
 
@@ -248,16 +213,7 @@ void test_unsupported_word_count_rejected() {
 
 void test_destroy_seed_result() {
     constexpr std::string_view dice =
-        "61234"
-        "62345"
-        "63456"
-        "64561"
-        "65612"
-        "66123"
-        "61234"
-        "62345"
-        "63456"
-        "64561";
+        "65515223131652132161133154444123616466443112153441";
 
     cryptomachine::SeedResult result;
 
@@ -278,16 +234,6 @@ void test_destroy_seed_result() {
         "destroy test must begin with mnemonic data"
     );
 
-    check(
-        !result.sanity.per_die[0].sequence.empty(),
-        "destroy test must begin with stored dice sequence"
-    );
-
-    check(
-        result.sanity.warning_count != 0,
-        "destroy test must begin with sanity warning data"
-    );
-
     cryptomachine::destroy_seed_result(result);
 
     check(
@@ -304,36 +250,6 @@ void test_destroy_seed_result() {
             "destroy must clear every mnemonic index"
         );
     }
-
-    check(
-        result.sanity.rolls_per_die == 0,
-        "destroy must clear rolls-per-die metadata"
-    );
-
-    check(
-        result.sanity.warning_count == 0,
-        "destroy must clear combined warning count"
-    );
-
-    check(
-        result.sanity.aggregate.total == 0,
-        "destroy must clear aggregate total"
-    );
-
-    for (
-        const auto& die :
-        result.sanity.per_die
-    ) {
-        check(
-            die.sequence.empty(),
-            "destroy must clear per-die sequence"
-        );
-
-        check(
-            die.warning_count == 0,
-            "destroy must clear per-die warning count"
-        );
-    }
 }
 
 }  // namespace
@@ -341,7 +257,7 @@ void test_destroy_seed_result() {
 int main() {
     test_12_word_seed();
     test_24_word_seed();
-    test_per_die_warning_reaches_seed_engine();
+    test_warning_pattern_does_not_change_engine_contract();
     test_49_outcomes_rejected();
     test_99_outcomes_rejected();
     test_unsupported_word_count_rejected();

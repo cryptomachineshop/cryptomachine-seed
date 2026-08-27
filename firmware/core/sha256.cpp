@@ -1,5 +1,7 @@
 #include "sha256.h"
 
+#include "secure_zero.h"
+
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -129,6 +131,14 @@ void process_block(
     state[5] += f;
     state[6] += g;
     state[7] += h;
+
+    // The SHA-256 message schedule is derived directly from
+    // the input block. Do not leave it resident in stack RAM
+    // after the compression step completes.
+    secure_zero(
+        words.data(),
+        words.size() * sizeof(words[0])
+    );
 }
 
 }  // namespace
@@ -224,6 +234,19 @@ Sha256Digest sha256(
                 state[index]
             );
     }
+
+    // tail contains the final copied input bytes plus SHA-256
+    // padding. state is fully derived from the input. The digest
+    // is the intended output, so preserve only that value.
+    secure_zero(
+        tail.data(),
+        tail.size()
+    );
+
+    secure_zero(
+        state.data(),
+        state.size() * sizeof(state[0])
+    );
 
     return digest;
 }

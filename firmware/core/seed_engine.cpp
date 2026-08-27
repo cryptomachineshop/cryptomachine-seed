@@ -32,15 +32,6 @@ SeedEngineStatus create_seed_from_dice(
         return SeedEngineStatus::InvalidDiceInput;
     }
 
-    if (!analyze_five_dice(
-            dice,
-            result.sanity
-        )) {
-        destroy_seed_result(result);
-
-        return SeedEngineStatus::SanityAnalysisFailed;
-    }
-
     DiceEntropy entropy{};
 
     if (!dice_to_entropy(
@@ -97,10 +88,6 @@ void destroy_seed_result(
     );
 
     result.mnemonic.word_count = 0;
-
-    destroy_five_dice_sanity(
-        result.sanity
-    );
 
     result = {};
 }
