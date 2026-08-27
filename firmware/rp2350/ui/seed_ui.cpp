@@ -1,11 +1,14 @@
 #include "seed_ui.h"
 
+#include "bip39_wordlist.h"
+#include "lvgl_port.h"
 #include "seed_app_controller.h"
 #include "secure_zero.h"
 #include "lvgl.h"
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <string_view>
 
 namespace cryptomachine::ui {
@@ -17,6 +20,39 @@ SeedAppController* g_app = nullptr;
 std::array<char, kDiceCount> g_dice_entry{};
 std::size_t g_dice_entry_count = 0;
 
+std::array<lv_obj_t*, kWordCount24> g_sensitive_word_labels{};
+std::size_t g_sensitive_word_label_count = 0;
+
+std::size_t g_mnemonic_word_index = 0;
+
+constexpr std::array<const char*, kWordCount24>
+    kWordNumbers = {
+        "1", "2", "3", "4", "5", "6",
+        "7", "8", "9", "10", "11", "12",
+        "13", "14", "15", "16", "17", "18",
+        "19", "20", "21", "22", "23", "24"
+    };
+
+constexpr std::array<const char*, kWordCount12>
+    kWordPositions12 = {
+        "WORD 1 OF 12", "WORD 2 OF 12", "WORD 3 OF 12",
+        "WORD 4 OF 12", "WORD 5 OF 12", "WORD 6 OF 12",
+        "WORD 7 OF 12", "WORD 8 OF 12", "WORD 9 OF 12",
+        "WORD 10 OF 12", "WORD 11 OF 12", "WORD 12 OF 12"
+    };
+
+constexpr std::array<const char*, kWordCount24>
+    kWordPositions24 = {
+        "WORD 1 OF 24", "WORD 2 OF 24", "WORD 3 OF 24",
+        "WORD 4 OF 24", "WORD 5 OF 24", "WORD 6 OF 24",
+        "WORD 7 OF 24", "WORD 8 OF 24", "WORD 9 OF 24",
+        "WORD 10 OF 24", "WORD 11 OF 24", "WORD 12 OF 24",
+        "WORD 13 OF 24", "WORD 14 OF 24", "WORD 15 OF 24",
+        "WORD 16 OF 24", "WORD 17 OF 24", "WORD 18 OF 24",
+        "WORD 19 OF 24", "WORD 20 OF 24", "WORD 21 OF 24",
+        "WORD 22 OF 24", "WORD 23 OF 24", "WORD 24 OF 24"
+    };
+
 void wipe_dice_entry() {
     secure_zero(
         g_dice_entry.data(),
@@ -24,6 +60,34 @@ void wipe_dice_entry() {
     );
 
     g_dice_entry_count = 0;
+}
+
+void clear_sensitive_word_label_refs() {
+    for (
+        std::size_t i = 0;
+        i < g_sensitive_word_label_count;
+        ++i
+    ) {
+        if (g_sensitive_word_labels[i] != nullptr) {
+            // The BIP39 dictionary itself is public, but the
+            // selected pointer identifies a secret mnemonic word.
+            // Replace the pointer before LVGL deletes the object.
+            lv_label_set_text_static(
+                g_sensitive_word_labels[i],
+                ""
+            );
+
+            g_sensitive_word_labels[i] = nullptr;
+        }
+    }
+
+    g_sensitive_word_label_count = 0;
+}
+
+void reset_sensitive_ui_state() {
+    clear_sensitive_word_label_refs();
+    wipe_dice_entry();
+    g_mnemonic_word_index = 0;
 }
 
 constexpr lv_color_t kBackground =
@@ -43,6 +107,8 @@ constexpr lv_color_t kButtonDark =
 
 void prepare_screen() {
     lv_obj_t* screen = lv_scr_act();
+
+    clear_sensitive_word_label_refs();
 
     lv_obj_clean(screen);
 
@@ -132,6 +198,70 @@ lv_obj_t* make_button(
     lv_obj_center(label);
 
     return button;
+}
+
+lv_obj_t* make_sensitive_word_label(
+    std::uint16_t word_index,
+    const lv_font_t* font,
+    lv_color_t color,
+    lv_coord_t width,
+    lv_coord_t height
+) {
+    if (
+        word_index >=
+        kBip39EnglishWordlist.size()
+    ) {
+        return nullptr;
+    }
+
+    if (
+        g_sensitive_word_label_count >=
+        g_sensitive_word_labels.size()
+    ) {
+        return nullptr;
+    }
+
+    lv_obj_t* label =
+        lv_label_create(lv_scr_act());
+
+    // Generated entries are string_views backed by string
+    // literals. Static text avoids copying the secret word
+    // into LVGL's heap.
+    lv_label_set_text_static(
+        label,
+        kBip39EnglishWordlist[word_index].data()
+    );
+
+    lv_obj_set_size(
+        label,
+        width,
+        height
+    );
+
+    lv_label_set_long_mode(
+        label,
+        LV_LABEL_LONG_CLIP
+    );
+
+    lv_obj_set_style_text_font(
+        label,
+        font,
+        0
+    );
+
+    lv_obj_set_style_text_color(
+        label,
+        color,
+        0
+    );
+
+    g_sensitive_word_labels[
+        g_sensitive_word_label_count
+    ] = label;
+
+    ++g_sensitive_word_label_count;
+
+    return label;
 }
 
 void create_header(
@@ -254,6 +384,9 @@ void render_dice_shake_review();
 void render_dice_complete();
 void render_dice_sanity_warning();
 void render_dice_generate_confirm();
+void render_mnemonic_word_view();
+void render_mnemonic_full_review();
+void render_session_destroy_confirm();
 
 void begin_dice_entry_event(
     lv_event_t* event
@@ -555,6 +688,187 @@ void generate_back_event(
 
     if (
         g_app->generate_back() ==
+        SeedAppStatus::Success
+    ) {
+        seed_ui_render();
+    }
+}
+
+void generate_mnemonic_event(
+    lv_event_t* event
+) {
+    if (
+        lv_event_get_code(event) !=
+        LV_EVENT_CLICKED
+    ) {
+        return;
+    }
+
+    if (g_app == nullptr) {
+        return;
+    }
+
+    if (
+        g_app->generate_mnemonic() ==
+        SeedAppStatus::Success
+    ) {
+        g_mnemonic_word_index = 0;
+        seed_ui_render();
+    }
+}
+
+void mnemonic_previous_event(
+    lv_event_t* event
+) {
+    if (
+        lv_event_get_code(event) !=
+        LV_EVENT_CLICKED
+    ) {
+        return;
+    }
+
+    if (g_mnemonic_word_index == 0) {
+        return;
+    }
+
+    --g_mnemonic_word_index;
+    seed_ui_render();
+}
+
+void mnemonic_next_event(
+    lv_event_t* event
+) {
+    if (
+        lv_event_get_code(event) !=
+        LV_EVENT_CLICKED
+    ) {
+        return;
+    }
+
+    if (g_app == nullptr) {
+        return;
+    }
+
+    const SeedResult* result =
+        g_app->seed_result();
+
+    if (
+        result == nullptr ||
+        result->mnemonic.word_count == 0 ||
+        result->mnemonic.word_count >
+            kWordCount24
+    ) {
+        return;
+    }
+
+    if (
+        g_mnemonic_word_index + 1 <
+        result->mnemonic.word_count
+    ) {
+        ++g_mnemonic_word_index;
+        seed_ui_render();
+        return;
+    }
+
+    if (
+        g_app->mnemonic_words_complete() ==
+        SeedAppStatus::Success
+    ) {
+        seed_ui_render();
+    }
+}
+
+void mnemonic_review_finish_event(
+    lv_event_t* event
+) {
+    if (
+        lv_event_get_code(event) !=
+        LV_EVENT_CLICKED
+    ) {
+        return;
+    }
+
+    if (g_app == nullptr) {
+        return;
+    }
+
+    if (
+        g_app->mnemonic_review_finish() ==
+        SeedAppStatus::Success
+    ) {
+        seed_ui_render();
+    }
+}
+
+void request_destroy_event(
+    lv_event_t* event
+) {
+    if (
+        lv_event_get_code(event) !=
+        LV_EVENT_CLICKED
+    ) {
+        return;
+    }
+
+    if (g_app == nullptr) {
+        return;
+    }
+
+    if (
+        g_app->request_destroy() ==
+        SeedAppStatus::Success
+    ) {
+        seed_ui_render();
+    }
+}
+
+void destroy_go_back_event(
+    lv_event_t* event
+) {
+    if (
+        lv_event_get_code(event) !=
+        LV_EVENT_CLICKED
+    ) {
+        return;
+    }
+
+    if (g_app == nullptr) {
+        return;
+    }
+
+    if (
+        g_app->destroy_go_back() ==
+        SeedAppStatus::Success
+    ) {
+        seed_ui_render();
+    }
+}
+
+void destroy_session_event(
+    lv_event_t* event
+) {
+    if (
+        lv_event_get_code(event) !=
+        LV_EVENT_CLICKED
+    ) {
+        return;
+    }
+
+    if (g_app == nullptr) {
+        return;
+    }
+
+    clear_sensitive_word_label_refs();
+    wipe_dice_entry();
+    g_mnemonic_word_index = 0;
+
+    // Defense in depth: scrub the complete LVGL RGB565
+    // draw buffer before the controller destroys the
+    // mnemonic and dice session.
+    lvgl_port_wipe_draw_buffer();
+
+    if (
+        g_app->destroy_session() ==
         SeedAppStatus::Success
     ) {
         seed_ui_render();
@@ -1168,15 +1482,13 @@ void render_dice_generate_confirm() {
         ready,
         LV_ALIGN_CENTER,
         0,
-        5
+        -5
     );
 
     lv_obj_t* message =
         make_label(
-            "The mnemonic renderer is the next "
-            "security milestone. Seed generation "
-            "is intentionally not triggered from "
-            "this screen yet.",
+            "The next screen reveals your "
+            "BIP39 mnemonic. Record it privately.",
             &lv_font_montserrat_14,
             kWhite
         );
@@ -1201,14 +1513,37 @@ void render_dice_generate_confirm() {
         message,
         LV_ALIGN_CENTER,
         0,
-        78
+        55
+    );
+
+    lv_obj_t* generate =
+        make_button(
+            "GENERATE SEED",
+            250,
+            70,
+            kOrange,
+            kBackground
+        );
+
+    lv_obj_align(
+        generate,
+        LV_ALIGN_CENTER,
+        0,
+        135
+    );
+
+    lv_obj_add_event_cb(
+        generate,
+        generate_mnemonic_event,
+        LV_EVENT_CLICKED,
+        nullptr
     );
 
     lv_obj_t* back =
         make_button(
             "BACK",
-            160,
-            54,
+            130,
+            50,
             kButtonDark,
             kWhite
         );
@@ -1217,7 +1552,7 @@ void render_dice_generate_confirm() {
         back,
         LV_ALIGN_BOTTOM_MID,
         0,
-        -24
+        -14
     );
 
     lv_obj_add_event_cb(
@@ -1228,11 +1563,411 @@ void render_dice_generate_confirm() {
     );
 }
 
+void render_mnemonic_word_view() {
+    prepare_screen();
+
+    const SeedResult* result =
+        g_app != nullptr
+            ? g_app->seed_result()
+            : nullptr;
+
+    if (
+        result == nullptr ||
+        result->mnemonic.word_count == 0 ||
+        result->mnemonic.word_count >
+            kWordCount24 ||
+        g_mnemonic_word_index >=
+            result->mnemonic.word_count
+    ) {
+        create_header(
+            "Mnemonic Error",
+            "Generated mnemonic is unavailable."
+        );
+
+        lv_obj_t* destroy =
+            make_button(
+                "DESTROY SESSION",
+                230,
+                62,
+                kOrange,
+                kBackground
+            );
+
+        lv_obj_align(
+            destroy,
+            LV_ALIGN_CENTER,
+            0,
+            80
+        );
+
+        lv_obj_add_event_cb(
+            destroy,
+            request_destroy_event,
+            LV_EVENT_CLICKED,
+            nullptr
+        );
+
+        return;
+    }
+
+    create_header(
+        "Record Seed",
+        "Write each word in exact order."
+    );
+
+    const std::size_t word_count =
+        result->mnemonic.word_count;
+
+    const char* position_text =
+        word_count == kWordCount24
+            ? kWordPositions24[
+                g_mnemonic_word_index
+            ]
+            : kWordPositions12[
+                g_mnemonic_word_index
+            ];
+
+    lv_obj_t* position =
+        make_label(
+            position_text,
+            &lv_font_montserrat_16,
+            kMuted
+        );
+
+    lv_obj_align(
+        position,
+        LV_ALIGN_TOP_MID,
+        0,
+        205
+    );
+
+    const std::uint16_t bip39_index =
+        result->mnemonic.word_indices[
+            g_mnemonic_word_index
+        ];
+
+    lv_obj_t* word =
+        make_sensitive_word_label(
+            bip39_index,
+            &lv_font_montserrat_24,
+            kOrange,
+            280,
+            52
+        );
+
+    if (word != nullptr) {
+        lv_obj_set_style_text_align(
+            word,
+            LV_TEXT_ALIGN_CENTER,
+            0
+        );
+
+        lv_obj_align(
+            word,
+            LV_ALIGN_TOP_MID,
+            0,
+            250
+        );
+    }
+
+    if (g_mnemonic_word_index > 0) {
+        lv_obj_t* previous =
+            make_button(
+                "PREVIOUS",
+                125,
+                54,
+                kButtonDark,
+                kWhite
+            );
+
+        lv_obj_align(
+            previous,
+            LV_ALIGN_CENTER,
+            -70,
+            100
+        );
+
+        lv_obj_add_event_cb(
+            previous,
+            mnemonic_previous_event,
+            LV_EVENT_CLICKED,
+            nullptr
+        );
+    }
+
+    const bool last_word =
+        g_mnemonic_word_index + 1 ==
+        word_count;
+
+    lv_obj_t* next =
+        make_button(
+            last_word
+                ? "FULL REVIEW"
+                : "NEXT",
+            125,
+            54,
+            kOrange,
+            kBackground
+        );
+
+    lv_obj_align(
+        next,
+        LV_ALIGN_CENTER,
+        70,
+        100
+    );
+
+    lv_obj_add_event_cb(
+        next,
+        mnemonic_next_event,
+        LV_EVENT_CLICKED,
+        nullptr
+    );
+
+    lv_obj_t* destroy =
+        make_button(
+            "DESTROY SESSION",
+            190,
+            46,
+            kButtonDark,
+            kWhite
+        );
+
+    lv_obj_align(
+        destroy,
+        LV_ALIGN_BOTTOM_MID,
+        0,
+        -12
+    );
+
+    lv_obj_add_event_cb(
+        destroy,
+        request_destroy_event,
+        LV_EVENT_CLICKED,
+        nullptr
+    );
+}
+
+void render_mnemonic_full_review() {
+    prepare_screen();
+
+    const SeedResult* result =
+        g_app != nullptr
+            ? g_app->seed_result()
+            : nullptr;
+
+    if (
+        result == nullptr ||
+        (
+            result->mnemonic.word_count !=
+                kWordCount12 &&
+            result->mnemonic.word_count !=
+                kWordCount24
+        )
+    ) {
+        create_header(
+            "Mnemonic Error",
+            "Generated mnemonic is unavailable."
+        );
+
+        return;
+    }
+
+    create_header(
+        "Full Review",
+        "Verify every word and exact order."
+    );
+
+    const std::size_t word_count =
+        result->mnemonic.word_count;
+
+    const std::size_t rows =
+        word_count == kWordCount24
+            ? 12
+            : 6;
+
+    constexpr lv_coord_t kStartY = 178;
+    constexpr lv_coord_t kRowStep = 20;
+
+    for (
+        std::size_t i = 0;
+        i < word_count;
+        ++i
+    ) {
+        const std::size_t column =
+            i / rows;
+
+        const std::size_t row =
+            i % rows;
+
+        const lv_coord_t number_x =
+            column == 0
+                ? 8
+                : 163;
+
+        const lv_coord_t word_x =
+            column == 0
+                ? 30
+                : 188;
+
+        const lv_coord_t y =
+            static_cast<lv_coord_t>(
+                kStartY +
+                row * kRowStep
+            );
+
+        lv_obj_t* number =
+            make_label(
+                kWordNumbers[i],
+                &lv_font_montserrat_14,
+                kMuted
+            );
+
+        lv_obj_align(
+            number,
+            LV_ALIGN_TOP_LEFT,
+            number_x,
+            y
+        );
+
+        const std::uint16_t bip39_index =
+            result->mnemonic.word_indices[i];
+
+        lv_obj_t* word =
+            make_sensitive_word_label(
+                bip39_index,
+                &lv_font_montserrat_14,
+                kWhite,
+                122,
+                18
+            );
+
+        if (word != nullptr) {
+            lv_obj_align(
+                word,
+                LV_ALIGN_TOP_LEFT,
+                word_x,
+                y
+            );
+        }
+    }
+
+    lv_obj_t* finish =
+        make_button(
+            "FINISH & DESTROY",
+            220,
+            50,
+            kOrange,
+            kBackground
+        );
+
+    lv_obj_align(
+        finish,
+        LV_ALIGN_BOTTOM_MID,
+        0,
+        -8
+    );
+
+    lv_obj_add_event_cb(
+        finish,
+        mnemonic_review_finish_event,
+        LV_EVENT_CLICKED,
+        nullptr
+    );
+}
+
+void render_session_destroy_confirm() {
+    prepare_screen();
+
+    create_header(
+        "Destroy Session",
+        "This action cannot be undone."
+    );
+
+    lv_obj_t* warning =
+        make_label(
+            "Wipe the generated mnemonic, "
+            "dice history, sanity data, and "
+            "session state from RAM?",
+            &lv_font_montserrat_16,
+            kWhite
+        );
+
+    lv_obj_set_width(
+        warning,
+        270
+    );
+
+    lv_label_set_long_mode(
+        warning,
+        LV_LABEL_LONG_WRAP
+    );
+
+    lv_obj_set_style_text_align(
+        warning,
+        LV_TEXT_ALIGN_CENTER,
+        0
+    );
+
+    lv_obj_align(
+        warning,
+        LV_ALIGN_CENTER,
+        0,
+        -25
+    );
+
+    lv_obj_t* destroy =
+        make_button(
+            "DESTROY & RETURN HOME",
+            270,
+            68,
+            kOrange,
+            kBackground
+        );
+
+    lv_obj_align(
+        destroy,
+        LV_ALIGN_CENTER,
+        0,
+        82
+    );
+
+    lv_obj_add_event_cb(
+        destroy,
+        destroy_session_event,
+        LV_EVENT_CLICKED,
+        nullptr
+    );
+
+    lv_obj_t* back =
+        make_button(
+            "GO BACK",
+            160,
+            50,
+            kButtonDark,
+            kWhite
+        );
+
+    lv_obj_align(
+        back,
+        LV_ALIGN_BOTTOM_MID,
+        0,
+        -18
+    );
+
+    lv_obj_add_event_cb(
+        back,
+        destroy_go_back_event,
+        LV_EVENT_CLICKED,
+        nullptr
+    );
+}
 }  // namespace
 
 void seed_ui_init(
     SeedAppController& app
 ) {
+    reset_sensitive_ui_state();
     g_app = &app;
     seed_ui_render();
 }
@@ -1273,6 +2008,18 @@ void seed_ui_render() {
 
         case UIState::DiceGenerateConfirm:
             render_dice_generate_confirm();
+            break;
+
+        case UIState::MnemonicWordView:
+            render_mnemonic_word_view();
+            break;
+
+        case UIState::MnemonicFullReview:
+            render_mnemonic_full_review();
+            break;
+
+        case UIState::SessionDestroyConfirm:
+            render_session_destroy_confirm();
             break;
 
         default:
