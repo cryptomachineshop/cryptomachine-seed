@@ -12,6 +12,7 @@ add_library(
     seed_ceremony.cpp
     ui_state_machine.cpp
     seed_app_controller.cpp
+    inactivity_policy.cpp
 )
 
 target_include_directories(

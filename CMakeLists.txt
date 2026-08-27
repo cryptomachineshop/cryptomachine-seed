@@ -45,10 +45,15 @@ target_link_libraries(
         cryptomachine_core
 )
 
-
 add_executable(
     test_cpp_dice_entropy
     firmware/host_tests/test_dice_entropy.cpp
+)
+
+target_link_libraries(
+    test_cpp_dice_entropy
+    PRIVATE
+        cryptomachine_core
 )
 
 add_executable(
@@ -58,13 +63,6 @@ add_executable(
 
 target_link_libraries(
     test_cpp_seed_pipeline
-    PRIVATE
-        cryptomachine_core
-)
-
-
-target_link_libraries(
-    test_cpp_dice_entropy
     PRIVATE
         cryptomachine_core
 )
@@ -157,6 +155,17 @@ target_link_libraries(
         cryptomachine_core
 )
 
+add_executable(
+    test_cpp_inactivity_policy
+    firmware/host_tests/test_inactivity_policy.cpp
+)
+
+target_link_libraries(
+    test_cpp_inactivity_policy
+    PRIVATE
+        cryptomachine_core
+)
+
 enable_testing()
 
 add_test(
@@ -222,4 +231,9 @@ add_test(
 add_test(
     NAME cpp_seed_app_controller
     COMMAND test_cpp_seed_app_controller
+)
+
+add_test(
+    NAME cpp_inactivity_policy
+    COMMAND test_cpp_inactivity_policy
 )

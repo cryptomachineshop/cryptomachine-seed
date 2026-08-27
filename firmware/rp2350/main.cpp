@@ -1,5 +1,6 @@
 #include "board_init.h"
 #include "display_st7796.h"
+#include "inactivity_policy.h"
 #include "lvgl_port.h"
 #include "seed_app_controller.h"
 #include "seed_ui.h"
@@ -18,29 +19,6 @@ constexpr std::uint32_t kInitialLcdSpiHz = 50'000'000;
 constexpr std::uint8_t kActiveBacklightPercent = 50;
 constexpr std::uint8_t kDimBacklightPercent = 10;
 constexpr std::uint8_t kWarningBacklightPercent = 30;
-
-constexpr std::uint64_t kMillisecondsPerSecond = 1'000;
-constexpr std::uint64_t kMillisecondsPerMinute =
-    60 * kMillisecondsPerSecond;
-
-// Product inactivity policy:
-//   3:00 idle -> dim, preserve ceremony
-//   9:00 idle -> hide ceremony, show 60-second warning
-//  10:00 idle -> securely destroy session and return Home
-constexpr std::uint64_t kDimAfterMs =
-    3 * kMillisecondsPerMinute;
-
-constexpr std::uint64_t kWarningAfterMs =
-    9 * kMillisecondsPerMinute;
-
-constexpr std::uint64_t kWipeAfterMs =
-    10 * kMillisecondsPerMinute;
-
-enum class InactivityState {
-    Active = 0,
-    Dimmed,
-    Warning,
-};
 
 std::uint64_t monotonic_ms() {
     return time_us_64() / 1'000ULL;
@@ -174,6 +152,96 @@ void destroy_session_for_inactivity(
     );
 }
 
+void apply_inactivity_decision(
+    cryptomachine::SeedAppController& app,
+    const cryptomachine::InactivityDecision& decision
+) {
+    using cryptomachine::InactivityEvent;
+
+    switch (decision.event) {
+        case InactivityEvent::None:
+            return;
+
+        case InactivityEvent::EnterDim:
+            cryptomachine::hardware::set_backlight_percent(
+                kDimBacklightPercent
+            );
+
+            // The first physical touch after dim is wake-only.
+            cryptomachine::ui::lvgl_port_arm_wake_guard();
+            return;
+
+        case InactivityEvent::EnterWarning:
+            // Never merely cover mnemonic pixels. Darken the panel,
+            // wipe the LVGL buffer, overwrite LCD GRAM, then build
+            // the generic warning.
+            cryptomachine::hardware::set_backlight_percent(0);
+
+            cryptomachine::ui::lvgl_port_arm_wake_guard();
+            cryptomachine::ui::lvgl_port_wipe_draw_buffer();
+
+            cryptomachine::hardware::display_fill(0x0000);
+
+            cryptomachine::ui::lvgl_port_wipe_draw_buffer();
+
+            cryptomachine::ui::seed_ui_show_inactivity_warning(
+                decision.warning_seconds
+            );
+
+            cryptomachine::hardware::set_backlight_percent(
+                kWarningBacklightPercent
+            );
+            return;
+
+        case InactivityEvent::WarningTick:
+            cryptomachine::ui::seed_ui_show_inactivity_warning(
+                decision.warning_seconds
+            );
+            return;
+
+        case InactivityEvent::WakeFromDim:
+            cryptomachine::hardware::set_backlight_percent(
+                kActiveBacklightPercent
+            );
+
+            // Do not cancel the port wake guard here. The first
+            // physical touch has been consumed, and suppression
+            // must remain until the finger is actually released.
+            return;
+
+        case InactivityEvent::WakeFromWarning:
+            // Hide the generic warning while reconstructing the
+            // exact controller/UI state.
+            cryptomachine::hardware::set_backlight_percent(0);
+
+            cryptomachine::ui::seed_ui_render();
+
+            cryptomachine::hardware::set_backlight_percent(
+                kActiveBacklightPercent
+            );
+
+            // As above, keep suppression until physical release.
+            return;
+
+        case InactivityEvent::Expire:
+            destroy_session_for_inactivity(app);
+            return;
+
+        case InactivityEvent::HomeReset:
+            cryptomachine::ui::lvgl_port_cancel_wake_guard();
+
+            // Re-rendering Home is harmless and guarantees that a
+            // generic inactivity warning cannot remain visible if
+            // controller state changed to Home while inactive.
+            cryptomachine::ui::seed_ui_render();
+
+            cryptomachine::hardware::set_backlight_percent(
+                kActiveBacklightPercent
+            );
+            return;
+    }
+}
+
 }  // namespace
 
 int main() {
@@ -288,13 +356,8 @@ int main() {
 
     std::printf("CryptoMachine Seed UI ready.\n");
 
-    std::uint64_t last_activity_ms =
-        monotonic_ms();
-
-    InactivityState inactivity_state =
-        InactivityState::Active;
-
-    std::uint32_t last_warning_seconds = 0;
+    cryptomachine::InactivityPolicy inactivity;
+    inactivity.reset(monotonic_ms());
 
     while (true) {
         const auto port_fault =
@@ -323,177 +386,22 @@ int main() {
             );
         }
 
-        const std::uint64_t now_ms =
-            monotonic_ms();
-
         const bool touch_activity =
             cryptomachine::ui::
                 lvgl_port_consume_touch_activity();
 
-        // Home has no seed ceremony to protect. Keep the normal
-        // UI awake and restart the inactivity clock there.
-        if (
-            app.state() ==
-            cryptomachine::UIState::Home
-        ) {
-            last_activity_ms = now_ms;
-
-            if (
-                inactivity_state !=
-                InactivityState::Active
-            ) {
-                cryptomachine::ui::
-                    lvgl_port_cancel_wake_guard();
-
-                if (
-                    inactivity_state ==
-                    InactivityState::Warning
-                ) {
-                    cryptomachine::ui::
-                        seed_ui_render();
-                }
-
-                set_backlight_percent(
-                    kActiveBacklightPercent
-                );
-
-                inactivity_state =
-                    InactivityState::Active;
-
-                last_warning_seconds = 0;
-            }
-
-            sleep_ms(5);
-            continue;
-        }
-
-        if (touch_activity) {
-            last_activity_ms = now_ms;
-
-            if (
-                inactivity_state ==
-                InactivityState::Warning
-            ) {
-                // Hide the generic warning while the real
-                // ceremony view is reconstructed.
-                set_backlight_percent(0);
-
-                cryptomachine::ui::
-                    seed_ui_render();
-            }
-
-            set_backlight_percent(
-                kActiveBacklightPercent
+        const auto decision =
+            inactivity.update(
+                monotonic_ms(),
+                app.state() ==
+                    cryptomachine::UIState::Home,
+                touch_activity
             );
 
-            inactivity_state =
-                InactivityState::Active;
-
-            last_warning_seconds = 0;
-
-            // Do NOT cancel the port wake guard here. The port
-            // has already consumed this first touch and must keep
-            // suppressing input until physical release.
-        }
-
-        const std::uint64_t elapsed_ms =
-            now_ms - last_activity_ms;
-
-        if (elapsed_ms >= kWipeAfterMs) {
-            destroy_session_for_inactivity(app);
-
-            last_activity_ms = now_ms;
-
-            inactivity_state =
-                InactivityState::Active;
-
-            last_warning_seconds = 0;
-
-            sleep_ms(5);
-            continue;
-        }
-
-        if (elapsed_ms >= kWarningAfterMs) {
-            const std::uint64_t remaining_ms =
-                kWipeAfterMs - elapsed_ms;
-
-            std::uint32_t remaining_seconds =
-                static_cast<std::uint32_t>(
-                    (
-                        remaining_ms +
-                        kMillisecondsPerSecond - 1
-                    ) /
-                    kMillisecondsPerSecond
-                );
-
-            if (remaining_seconds == 0) {
-                remaining_seconds = 1;
-            }
-
-            if (
-                inactivity_state !=
-                InactivityState::Warning
-            ) {
-                // The warning must never merely cover mnemonic
-                // pixels. Darken the panel and overwrite GRAM
-                // before constructing the generic warning.
-                set_backlight_percent(0);
-
-                cryptomachine::ui::
-                    lvgl_port_arm_wake_guard();
-
-                cryptomachine::ui::
-                    lvgl_port_wipe_draw_buffer();
-
-                display_fill(0x0000);
-
-                cryptomachine::ui::
-                    lvgl_port_wipe_draw_buffer();
-
-                cryptomachine::ui::
-                    seed_ui_show_inactivity_warning(
-                        remaining_seconds
-                    );
-
-                set_backlight_percent(
-                    kWarningBacklightPercent
-                );
-
-                inactivity_state =
-                    InactivityState::Warning;
-
-                last_warning_seconds =
-                    remaining_seconds;
-            } else if (
-                remaining_seconds !=
-                last_warning_seconds
-            ) {
-                cryptomachine::ui::
-                    seed_ui_show_inactivity_warning(
-                        remaining_seconds
-                    );
-
-                last_warning_seconds =
-                    remaining_seconds;
-            }
-        } else if (
-            elapsed_ms >= kDimAfterMs &&
-            inactivity_state ==
-                InactivityState::Active
-        ) {
-            set_backlight_percent(
-                kDimBacklightPercent
-            );
-
-            // From this point onward, the first physical touch
-            // is wake-only and cannot activate the button that
-            // happened to be underneath the user's finger.
-            cryptomachine::ui::
-                lvgl_port_arm_wake_guard();
-
-            inactivity_state =
-                InactivityState::Dimmed;
-        }
+        apply_inactivity_decision(
+            app,
+            decision
+        );
 
         sleep_ms(5);
     }
