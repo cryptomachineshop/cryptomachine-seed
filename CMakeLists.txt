@@ -10,27 +10,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_library(
-    cryptomachine_core
-    firmware/core/dice_policy.cpp
-    firmware/core/sha256.cpp
-    firmware/core/bip39.cpp
-    firmware/core/dice_entropy.cpp
-    firmware/core/bip39_wordlist.cpp
-    firmware/core/dice_sanity.cpp
-    firmware/core/seed_engine.cpp
-    firmware/core/secure_zero.cpp
-    firmware/core/dice_session.cpp
-    firmware/core/seed_ceremony.cpp
-    firmware/core/ui_state_machine.cpp
-    firmware/core/seed_app_controller.cpp
-)
-
-target_include_directories(
-    cryptomachine_core
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/firmware/core
-)
+add_subdirectory(firmware/core)
 
 add_executable(
     test_cpp_dice_policy

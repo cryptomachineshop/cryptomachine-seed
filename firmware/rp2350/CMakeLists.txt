@@ -37,6 +37,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 pico_sdk_init()
 
+add_subdirectory(
+    ../core
+    ${CMAKE_CURRENT_BINARY_DIR}/cryptomachine_core
+)
+
 add_subdirectory(third_party/lvgl)
 
 add_executable(
@@ -67,6 +72,7 @@ target_link_libraries(
         hardware_clocks
         hardware_vreg
         cryptomachine_lvgl
+        cryptomachine_core
 )
 
 pico_enable_stdio_usb(
