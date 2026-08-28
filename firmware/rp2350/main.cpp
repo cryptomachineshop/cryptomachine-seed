@@ -125,31 +125,38 @@ const char* seed_ui_fault_name(
     }
 }
 
-void destroy_session_for_inactivity(
-    cryptomachine::SeedAppController& app
-) {
-    // Make the secret display physically dark before touching
-    // session state or constructing the Home screen.
+void finalize_destroyed_session_display() {
+    // The controller must already contain no sensitive session
+    // material before this function is called.
+    //
+    // Physically darken first, remove all UI-side references,
+    // scrub LVGL pixels, overwrite controller GRAM, then build
+    // the non-sensitive Home screen.
     cryptomachine::hardware::set_backlight_percent(0);
-
-    app.emergency_destroy_session();
 
     cryptomachine::ui::seed_ui_emergency_clear();
     cryptomachine::ui::lvgl_port_wipe_draw_buffer();
 
-    // Overwrite ST7796 GRAM so mnemonic/dice pixels cannot
-    // survive behind the next LVGL screen.
     cryptomachine::hardware::display_fill(0x0000);
 
     cryptomachine::ui::lvgl_port_wipe_draw_buffer();
     cryptomachine::ui::lvgl_port_cancel_wake_guard();
 
-    // emergency_destroy_session() reset the controller to Home.
     cryptomachine::ui::seed_ui_render();
 
     cryptomachine::hardware::set_backlight_percent(
         kActiveBacklightPercent
     );
+}
+
+void destroy_session_for_inactivity(
+    cryptomachine::SeedAppController& app
+) {
+    // Timeout destruction is unconditional because no UI state
+    // transition can be trusted to have been requested by a user.
+    app.emergency_destroy_session();
+
+    finalize_destroyed_session_display();
 }
 
 void apply_inactivity_decision(
@@ -384,6 +391,21 @@ int main() {
                 app,
                 seed_ui_fault_name(ui_fault)
             );
+        }
+
+        if (
+            cryptomachine::ui::
+                seed_ui_consume_destroy_display_clear_request()
+        ) {
+            // Normal user-confirmed controller destruction has
+            // already completed. Finish the physical/UI wipe now,
+            // safely outside the LVGL event callback.
+            finalize_destroyed_session_display();
+
+            inactivity.reset(monotonic_ms());
+
+            sleep_ms(5);
+            continue;
         }
 
         const bool touch_activity =

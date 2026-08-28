@@ -193,6 +193,12 @@ public:
     void emergency_destroy_session();
 
 private:
+    // Single controller-owned destruction primitive used by both
+    // the normal confirmed-destroy path and unconditional emergency
+    // destruction. Keep all sensitive controller state here so the
+    // two public destruction routes cannot drift apart.
+    void destroy_sensitive_state();
+
     void wipe_pending_shake();
 
     void wipe_sanity_report();

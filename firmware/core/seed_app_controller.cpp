@@ -469,10 +469,7 @@ SeedAppStatus SeedAppController::destroy_session() {
         return SeedAppStatus::InvalidState;
     }
 
-    wipe_pending_shake();
-    wipe_sanity_report();
-
-    ceremony_.destroy_session();
+    destroy_sensitive_state();
 
     return map_ui_status(
         ui_.destroy_session()
@@ -482,11 +479,14 @@ SeedAppStatus SeedAppController::destroy_session() {
 void SeedAppController::emergency_destroy_session() {
     // Do not consult UI state here. A critical hardware/runtime
     // fault may mean the normal UI flow can no longer be trusted.
+    destroy_sensitive_state();
+    ui_.emergency_reset_to_home();
+}
+
+void SeedAppController::destroy_sensitive_state() {
     wipe_pending_shake();
     wipe_sanity_report();
-
     ceremony_.destroy_session();
-    ui_.emergency_reset_to_home();
 }
 
 void SeedAppController::wipe_pending_shake() {

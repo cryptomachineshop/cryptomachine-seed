@@ -925,6 +925,11 @@ void destroy_go_back_event(
     );
 }
 
+// Set only after the user-confirmed controller destruction succeeds.
+// main() consumes this after lv_timer_handler() returns, then performs
+// the backlight-off + LCD-GRAM overwrite outside the LVGL callback.
+bool g_destroy_display_clear_requested = false;
+
 void destroy_session_event(
     lv_event_t* event
 ) {
@@ -948,9 +953,18 @@ void destroy_session_event(
 
     lvgl_port_wipe_draw_buffer();
 
-    render_after_controller_action(
-        app->destroy_session()
-    );
+    const SeedAppStatus status =
+        app->destroy_session();
+
+    if (!controller_action_succeeded(status)) {
+        return;
+    }
+
+    // Do not render Home from inside this LVGL event callback.
+    // The controller is already securely destroyed and at Home.
+    // main() will darken the panel, clean the UI, overwrite LCD
+    // GRAM, and only then render the non-sensitive Home screen.
+    g_destroy_display_clear_requested = true;
 }
 
 void render_home() {
@@ -2059,6 +2073,7 @@ void render_session_destroy_confirm() {
 lv_obj_t* g_inactivity_countdown_label = nullptr;
 bool g_inactivity_warning_visible = false;
 
+
 }  // namespace
 
 void seed_ui_emergency_clear() {
@@ -2068,6 +2083,7 @@ void seed_ui_emergency_clear() {
 
     g_inactivity_countdown_label = nullptr;
     g_inactivity_warning_visible = false;
+    g_destroy_display_clear_requested = false;
 
     lv_obj_t* screen = lv_scr_act();
 
@@ -2225,8 +2241,19 @@ void seed_ui_init(
     g_ui_fault =
         SeedUiFault::None;
 
+    g_destroy_display_clear_requested = false;
+
     g_app = &app;
     seed_ui_render();
+}
+
+bool seed_ui_consume_destroy_display_clear_request() {
+    const bool requested =
+        g_destroy_display_clear_requested;
+
+    g_destroy_display_clear_requested = false;
+
+    return requested;
 }
 
 SeedUiFault seed_ui_fault() {
