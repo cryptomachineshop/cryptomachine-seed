@@ -558,6 +558,131 @@ void test_emergency_destroy_pending_shake() {
     );
 }
 
+
+void test_emergency_destroy_is_idempotent() {
+    cryptomachine::SeedAppController app;
+
+    app.boot_complete();
+    app.open_create_from_dice();
+    app.choose_dice_word_count(12);
+    app.begin_dice_entry();
+
+    check(
+        app.enter_shake_for_review("12345") ==
+            cryptomachine::SeedAppStatus::Success,
+        "idempotence test must create pending shake"
+    );
+
+    app.emergency_destroy_session();
+    app.emergency_destroy_session();
+
+    check(
+        app.state() == cryptomachine::UIState::Home,
+        "repeated emergency destroy must remain Home"
+    );
+    check(app.word_count() == 0, "repeated emergency destroy must keep word count cleared");
+    check(app.shake_count() == 0, "repeated emergency destroy must keep dice history cleared");
+    check(!app.has_pending_shake(), "repeated emergency destroy must keep pending shake cleared");
+    check(app.pending_shake().empty(), "repeated emergency destroy must expose no pending shake");
+    check(!app.sanity_report_ready(), "repeated emergency destroy must keep sanity state cleared");
+    check(app.sanity_report() == nullptr, "repeated emergency destroy must expose no sanity report");
+    check(app.seed_result() == nullptr, "repeated emergency destroy must expose no seed result");
+    check(!app.generated(), "repeated emergency destroy must keep generated state cleared");
+    check(!app.sensitive_data_present(), "repeated emergency destroy must keep sensitive state cleared");
+}
+
+void test_emergency_destroy_blocks_stale_actions() {
+    cryptomachine::SeedAppController app;
+
+    app.boot_complete();
+    app.open_create_from_dice();
+    app.choose_dice_word_count(12);
+    app.begin_dice_entry();
+
+    check(
+        app.enter_shake_for_review("12345") ==
+            cryptomachine::SeedAppStatus::Success,
+        "stale-action test must create pending shake"
+    );
+
+    app.emergency_destroy_session();
+
+    check(
+        app.confirm_pending_shake() !=
+            cryptomachine::SeedAppStatus::Success,
+        "stale pending-shake confirmation must be rejected after emergency destroy"
+    );
+    check(
+        app.reenter_pending_shake() !=
+            cryptomachine::SeedAppStatus::Success,
+        "stale pending-shake re-entry must be rejected after emergency destroy"
+    );
+    check(
+        app.generate_mnemonic() !=
+            cryptomachine::SeedAppStatus::Success,
+        "stale generation action must be rejected after emergency destroy"
+    );
+
+    check(app.state() == cryptomachine::UIState::Home, "rejected stale actions must not leave Home");
+    check(app.shake_count() == 0, "rejected stale actions must not restore dice history");
+    check(!app.has_pending_shake(), "rejected stale actions must not restore pending shake");
+    check(!app.sanity_report_ready(), "rejected stale actions must not restore sanity state");
+    check(app.seed_result() == nullptr, "rejected stale actions must not restore seed result");
+    check(!app.sensitive_data_present(), "rejected stale actions must not restore sensitive state");
+}
+
+void test_emergency_destroy_dice_complete_and_reuse() {
+    cryptomachine::SeedAppController app;
+
+    complete_known_12_word_dice(app);
+
+    check(
+        app.state() == cryptomachine::UIState::DiceComplete,
+        "reuse test must reach DiceComplete before emergency destroy"
+    );
+    check(app.shake_count() == 10, "reuse test must contain completed dice history before wipe");
+    check(app.sanity_report_ready(), "reuse test must contain sanity report before wipe");
+
+    app.emergency_destroy_session();
+
+    check(app.state() == cryptomachine::UIState::Home, "DiceComplete emergency destroy must return Home");
+    check(app.shake_count() == 0, "DiceComplete emergency destroy must clear dice history");
+    check(!app.sanity_report_ready(), "DiceComplete emergency destroy must clear sanity state");
+    check(app.sanity_report() == nullptr, "DiceComplete emergency destroy must expose no sanity report");
+    check(app.seed_result() == nullptr, "DiceComplete emergency destroy must expose no seed result");
+    check(!app.sensitive_data_present(), "DiceComplete emergency destroy must clear sensitive state");
+
+    check(
+        app.open_create_from_dice() ==
+            cryptomachine::SeedAppStatus::Success,
+        "fresh dice workflow must open after emergency destroy"
+    );
+    check(
+        app.choose_dice_word_count(12) ==
+            cryptomachine::SeedAppStatus::Success,
+        "fresh word-count selection must work after emergency destroy"
+    );
+    check(
+        app.begin_dice_entry() ==
+            cryptomachine::SeedAppStatus::Success,
+        "fresh dice entry must work after emergency destroy"
+    );
+    check(
+        app.enter_shake_for_review("65432") ==
+            cryptomachine::SeedAppStatus::Success,
+        "fresh shake must enter review after emergency destroy"
+    );
+    check(
+        app.confirm_pending_shake() ==
+            cryptomachine::SeedAppStatus::Success,
+        "fresh shake must commit after emergency destroy"
+    );
+
+    check(app.shake_count() == 1, "fresh workflow must begin with new dice history only");
+    check(!app.sanity_report_ready(), "fresh partial workflow must not expose stale sanity state");
+    check(app.seed_result() == nullptr, "fresh partial workflow must not expose stale seed result");
+}
+
 void test_emergency_destroy_generated_session() {
     cryptomachine::SeedAppController app;
 
@@ -665,6 +790,9 @@ int main() {
     test_real_12_word_workflow();
     test_warning_route_and_restart();
     test_emergency_destroy_pending_shake();
+    test_emergency_destroy_is_idempotent();
+    test_emergency_destroy_blocks_stale_actions();
+    test_emergency_destroy_dice_complete_and_reuse();
     test_emergency_destroy_generated_session();
 
     if (failures != 0) {
