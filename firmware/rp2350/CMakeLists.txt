@@ -41,6 +41,20 @@ option(
     OFF
 )
 
+option(
+    CRYPTOMACHINE_SIGN_FIRMWARE
+    "Cryptographically sign the RP2350 firmware image"
+    OFF
+)
+
+set(
+    CRYPTOMACHINE_SIGNING_KEY
+    ""
+    CACHE FILEPATH
+    "External secp256k1 PEM private key used to sign firmware"
+)
+
+
 pico_sdk_init()
 
 add_subdirectory(
@@ -120,6 +134,54 @@ pico_enable_stdio_uart(
     cryptomachine_seed
     0
 )
+
+if(CRYPTOMACHINE_SIGN_FIRMWARE)
+    if(CRYPTOMACHINE_DEV_LOGGING)
+        message(
+            FATAL_ERROR
+            "Signed production firmware cannot enable development logging"
+        )
+    endif()
+
+    if(CRYPTOMACHINE_SIGNING_KEY STREQUAL "")
+        message(
+            FATAL_ERROR
+            "CRYPTOMACHINE_SIGNING_KEY must point to an external "
+            "secp256k1 PEM private key when firmware signing is enabled"
+        )
+    endif()
+
+    if(NOT EXISTS "${CRYPTOMACHINE_SIGNING_KEY}")
+        message(
+            FATAL_ERROR
+            "CryptoMachine signing key does not exist: "
+            "${CRYPTOMACHINE_SIGNING_KEY}"
+        )
+    endif()
+
+    # Configure picotool signing before pico_add_extra_outputs().
+    # The OTP JSON contains the public-key fingerprint and related
+    # provisioning rows. Generating this file does not program OTP.
+    pico_set_otp_key_output_file(
+        cryptomachine_seed
+        "${CMAKE_CURRENT_BINARY_DIR}/cryptomachine_seed.otp.json"
+    )
+
+    pico_sign_binary(
+        cryptomachine_seed
+        "${CRYPTOMACHINE_SIGNING_KEY}"
+    )
+
+    message(
+        STATUS
+        "CryptoMachine firmware signing: ENABLED"
+    )
+else()
+    message(
+        STATUS
+        "CryptoMachine firmware signing: DISABLED"
+    )
+endif()
 
 pico_add_extra_outputs(
     cryptomachine_seed
