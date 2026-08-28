@@ -62,6 +62,12 @@ option(
     OFF
 )
 
+option(
+    CRYPTOMACHINE_STACK_USAGE_ANALYSIS
+    "Generate GCC .su stack-usage reports for first-party firmware targets"
+    OFF
+)
+
 if(CRYPTOMACHINE_PRODUCTION_RELEASE)
     if(CRYPTOMACHINE_DEV_LOGGING)
         message(
@@ -74,6 +80,13 @@ if(CRYPTOMACHINE_PRODUCTION_RELEASE)
         message(
             FATAL_ERROR
             "Production release requires firmware signing"
+        )
+    endif()
+
+    if(NOT CRYPTOMACHINE_STACK_USAGE_ANALYSIS)
+        message(
+            FATAL_ERROR
+            "Production release requires first-party stack usage analysis"
         )
     endif()
 
@@ -115,6 +128,18 @@ target_include_directories(
         ${CMAKE_CURRENT_LIST_DIR}/ui
 )
 
+target_compile_definitions(
+    cryptomachine_seed
+    PRIVATE
+        PICO_STACK_SIZE=0x1000
+        PICO_USE_STACK_GUARDS=1
+)
+
+message(
+    STATUS
+    "CryptoMachine main stack: 4096 bytes with RP2350 stack guards"
+)
+
 target_link_libraries(
     cryptomachine_seed
     PRIVATE
@@ -128,6 +153,30 @@ target_link_libraries(
         cryptomachine_lvgl
         cryptomachine_core
 )
+
+if(CRYPTOMACHINE_STACK_USAGE_ANALYSIS)
+    target_compile_options(
+        cryptomachine_seed
+        PRIVATE
+            -fstack-usage
+    )
+
+    target_compile_options(
+        cryptomachine_core
+        PRIVATE
+            -fstack-usage
+    )
+
+    message(
+        STATUS
+        "CryptoMachine first-party stack usage analysis: ENABLED"
+    )
+else()
+    message(
+        STATUS
+        "CryptoMachine first-party stack usage analysis: DISABLED"
+    )
+endif()
 
 if(CRYPTOMACHINE_DEV_LOGGING)
     target_compile_definitions(

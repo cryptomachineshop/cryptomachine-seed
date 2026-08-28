@@ -43,6 +43,7 @@ $requiredCacheValues = @{
     "CRYPTOMACHINE_PRODUCTION_RELEASE:BOOL=ON" = "production release guard is enabled"
     "CRYPTOMACHINE_DEV_LOGGING:BOOL=OFF"       = "development logging is disabled"
     "CRYPTOMACHINE_SIGN_FIRMWARE:BOOL=ON"      = "firmware signing is enabled"
+    "CRYPTOMACHINE_STACK_USAGE_ANALYSIS:BOOL=ON" = "first-party stack usage analysis is enabled"
 }
 
 foreach ($entry in $requiredCacheValues.GetEnumerator()) {
@@ -109,6 +110,33 @@ if ($LASTEXITCODE -ne 0) {
     Fail "arm-none-eabi-nm could not inspect the ELF"
 }
 
+$stackBottomMatch = [regex]::Match(
+    $symbols,
+    '(?m)^([0-9A-Fa-f]+)\s+[A-Za-z]\s+__StackBottom\s*$'
+)
+$stackTopMatch = [regex]::Match(
+    $symbols,
+    '(?m)^([0-9A-Fa-f]+)\s+[A-Za-z]\s+__StackTop\s*$'
+)
+
+if (-not $stackBottomMatch.Success -or -not $stackTopMatch.Success) {
+    Fail "Could not resolve __StackBottom/__StackTop from production ELF"
+}
+
+$stackBottom = [Convert]::ToInt64($stackBottomMatch.Groups[1].Value, 16)
+$stackTop = [Convert]::ToInt64($stackTopMatch.Groups[1].Value, 16)
+$mainStackBytes = $stackTop - $stackBottom
+
+if ($mainStackBytes -ne 4096) {
+    Fail "Production main stack is $mainStackBytes bytes; expected exactly 4096"
+}
+Pass "Production main stack reservation is 4096 bytes"
+
+if ($symbols -notmatch '(?m)\bruntime_init_per_core_install_stack_guard\b') {
+    Fail "RP2350 stack-guard runtime support is not present in production ELF"
+}
+Pass "RP2350 stack-guard runtime support is present"
+
 $forbiddenSymbolPattern = 'stdio_init_all|stdio_usb|tud_cdc|tud_|usbd_|tinyusb|reset_usb_boot|rom_reset_usb_boot'
 if ($symbols -match $forbiddenSymbolPattern) {
     $matches = ($symbols -split "`r?`n" |
@@ -117,6 +145,55 @@ if ($symbols -match $forbiddenSymbolPattern) {
     Fail "Unexpected USB/dev symbols found in production ELF:`n$matches"
 }
 Pass "Production ELF contains no known USB/dev runtime symbols"
+
+$maxAllowedFrameBytes = 1024
+$stackUsageFiles = Get-ChildItem $buildPath -Recurse -Filter "*.su" -File
+
+if (-not $stackUsageFiles) {
+    Fail "No compiler .su stack-usage reports were found in the production build"
+}
+
+$firstPartyFrames = foreach ($file in $stackUsageFiles) {
+    foreach ($line in Get-Content $file.FullName) {
+        if ($line -match '^(.*)\t(\d+)\t(.*)$') {
+            $functionName = $matches[1]
+            $frameBytes = [int]$matches[2]
+            $frameType = $matches[3]
+
+            if (
+                $functionName -match 'cryptomachine-seed[\\/]+firmware[\\/]' -and
+                $functionName -notmatch '[\\/]third_party[\\/]'
+            ) {
+                [PSCustomObject]@{
+                    Function = $functionName
+                    Bytes = $frameBytes
+                    Type = $frameType
+                }
+            }
+        }
+    }
+}
+
+if (-not $firstPartyFrames) {
+    Fail "No first-party stack-usage records were found"
+}
+
+$largestFrame = $firstPartyFrames |
+    Sort-Object Bytes -Descending |
+    Select-Object -First 1
+
+if ($largestFrame.Bytes -gt $maxAllowedFrameBytes) {
+    Fail (
+        "First-party static stack frame exceeds budget: " +
+        "$($largestFrame.Bytes) bytes > $maxAllowedFrameBytes bytes`n" +
+        "$($largestFrame.Function)"
+    )
+}
+
+Pass (
+    "Largest first-party static stack frame is " +
+    "$($largestFrame.Bytes) bytes (limit $maxAllowedFrameBytes)"
+)
 
 $strings = Get-Command "arm-none-eabi-strings.exe" -ErrorAction SilentlyContinue
 if (-not $strings) {
