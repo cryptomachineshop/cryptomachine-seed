@@ -55,6 +55,39 @@ set(
 )
 
 
+
+option(
+    CRYPTOMACHINE_PRODUCTION_RELEASE
+    "Require hardened settings for a distributable production firmware release"
+    OFF
+)
+
+if(CRYPTOMACHINE_PRODUCTION_RELEASE)
+    if(CRYPTOMACHINE_DEV_LOGGING)
+        message(
+            FATAL_ERROR
+            "Production release cannot enable development logging"
+        )
+    endif()
+
+    if(NOT CRYPTOMACHINE_SIGN_FIRMWARE)
+        message(
+            FATAL_ERROR
+            "Production release requires firmware signing"
+        )
+    endif()
+
+    message(
+        STATUS
+        "CryptoMachine production release guard: ENABLED"
+    )
+else()
+    message(
+        STATUS
+        "CryptoMachine production release guard: DISABLED"
+    )
+endif()
+
 pico_sdk_init()
 
 add_subdirectory(
