@@ -35,6 +35,12 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+option(
+    CRYPTOMACHINE_DEV_LOGGING
+    "Enable development-only USB stdio diagnostics"
+    OFF
+)
+
 pico_sdk_init()
 
 add_subdirectory(
@@ -76,10 +82,39 @@ target_link_libraries(
         cryptomachine_core
 )
 
-pico_enable_stdio_usb(
-    cryptomachine_seed
-    1
-)
+if(CRYPTOMACHINE_DEV_LOGGING)
+    target_compile_definitions(
+        cryptomachine_seed
+        PRIVATE
+            CRYPTOMACHINE_DEV_LOGGING=1
+    )
+
+    pico_enable_stdio_usb(
+        cryptomachine_seed
+        1
+    )
+
+    message(
+        STATUS
+        "CryptoMachine development USB logging: ENABLED"
+    )
+else()
+    target_compile_definitions(
+        cryptomachine_seed
+        PRIVATE
+            CRYPTOMACHINE_DEV_LOGGING=0
+    )
+
+    pico_enable_stdio_usb(
+        cryptomachine_seed
+        0
+    )
+
+    message(
+        STATUS
+        "CryptoMachine development USB logging: DISABLED"
+    )
+endif()
 
 pico_enable_stdio_uart(
     cryptomachine_seed

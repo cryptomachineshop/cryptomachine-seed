@@ -1,5 +1,6 @@
 #include "board_init.h"
 #include "display_st7796.h"
+#include "dev_log.h"
 #include "inactivity_policy.h"
 #include "lvgl_port.h"
 #include "seed_app_controller.h"
@@ -10,7 +11,6 @@
 #include "pico/time.h"
 
 #include <cstdint>
-#include <cstdio>
 
 namespace {
 
@@ -82,7 +82,7 @@ const char* seed_ui_fault_name(
 ) {
     cryptomachine::hardware::set_backlight_percent(0);
 
-    std::printf(
+    CM_DEV_LOG(
         "STARTUP HALTED: %s\n",
         message != nullptr
             ? message
@@ -108,14 +108,14 @@ const char* seed_ui_fault_name(
 
     cryptomachine::ui::lvgl_port_wipe_draw_buffer();
 
-    std::printf(
+    CM_DEV_LOG(
         "RUNTIME FAULT: %s\n",
         fault_name != nullptr
             ? fault_name
             : "unknown runtime error"
     );
 
-    std::printf(
+    CM_DEV_LOG(
         "Sensitive session destroyed. "
         "Power-cycle required.\n"
     );
@@ -261,10 +261,15 @@ int main() {
 
     set_backlight_percent(0);
 
+#if CRYPTOMACHINE_DEV_LOGGING
+    // USB stdio and its enumeration delay exist only in explicit
+    // development builds. Production begins immediately with no
+    // first-party diagnostic transport initialized.
     stdio_init_all();
     sleep_ms(1500);
+#endif
 
-    std::printf(
+    CM_DEV_LOG(
         "\nCryptoMachine Seed RP2350 bring-up\n"
     );
 
@@ -277,32 +282,32 @@ int main() {
         );
     }
 
-    std::printf("SeedAppController ready.\n");
-    std::printf("Board: Waveshare RP2350-Touch-LCD-3.5\n");
-    std::printf("MCU package: RP2350B\n");
+    CM_DEV_LOG("SeedAppController ready.\n");
+    CM_DEV_LOG("Board: Waveshare RP2350-Touch-LCD-3.5\n");
+    CM_DEV_LOG("MCU package: RP2350B\n");
 
-    std::printf(
+    CM_DEV_LOG(
         "LCD SPI requested: %lu Hz\n",
         static_cast<unsigned long>(
             kInitialLcdSpiHz
         )
     );
 
-    std::printf(
+    CM_DEV_LOG(
         "LCD SPI actual:    %lu Hz\n",
         static_cast<unsigned long>(
             bus_rates.lcd_spi_hz
         )
     );
 
-    std::printf(
+    CM_DEV_LOG(
         "I2C actual:        %lu Hz\n",
         static_cast<unsigned long>(
             bus_rates.i2c_hz
         )
     );
 
-    std::printf("Initializing ST7796 display...\n");
+    CM_DEV_LOG("Initializing ST7796 display...\n");
 
     if (!display_init(DisplayOrientation::Portrait)) {
         halt_startup(
@@ -312,18 +317,18 @@ int main() {
 
     display_fill(0x0000);
 
-    std::printf(
+    CM_DEV_LOG(
         "Display initialized: %u x %u\n",
         static_cast<unsigned int>(display_width()),
         static_cast<unsigned int>(display_height())
     );
 
-    std::printf("Initializing FT6336U touch...\n");
+    CM_DEV_LOG("Initializing FT6336U touch...\n");
 
     const TouchStatus touch_status =
         touch_init();
 
-    std::printf(
+    CM_DEV_LOG(
         "Touch initialization: %s\n",
         touch_status_name(touch_status)
     );
@@ -334,7 +339,7 @@ int main() {
         );
     }
 
-    std::printf("Initializing LVGL...\n");
+    CM_DEV_LOG("Initializing LVGL...\n");
 
     if (!cryptomachine::ui::lvgl_port_init()) {
         halt_startup(
@@ -361,7 +366,7 @@ int main() {
         kActiveBacklightPercent
     );
 
-    std::printf("CryptoMachine Seed UI ready.\n");
+    CM_DEV_LOG("CryptoMachine Seed UI ready.\n");
 
     cryptomachine::InactivityPolicy inactivity;
     inactivity.reset(monotonic_ms());
