@@ -10,6 +10,105 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+option(
+    CRYPTOMACHINE_HOST_SANITIZERS
+    "Enable AddressSanitizer and UndefinedBehaviorSanitizer for host tests"
+    OFF
+)
+
+if(CRYPTOMACHINE_HOST_SANITIZERS)
+    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        message(
+            FATAL_ERROR
+            "Host sanitizers require Clang or GNU C++"
+        )
+    endif()
+
+    if(WIN32)
+        # Clang ASan on Windows must use the non-debug MSVC runtime.
+        # The debug CRT can report allocator mismatches before test
+        # code begins executing.
+        set(
+            CMAKE_MSVC_RUNTIME_LIBRARY
+            "MultiThreadedDLL"
+        )
+
+        if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+            message(
+                FATAL_ERROR
+                "Windows host sanitizers currently require Clang"
+            )
+        endif()
+
+        if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+            message(
+                FATAL_ERROR
+                "Windows host sanitizer runtime handling currently supports x64 only"
+            )
+        endif()
+
+        execute_process(
+            COMMAND
+                "${CMAKE_CXX_COMPILER}"
+                -print-resource-dir
+            OUTPUT_VARIABLE
+                CRYPTOMACHINE_CLANG_RESOURCE_DIR
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            RESULT_VARIABLE
+                CRYPTOMACHINE_CLANG_RESOURCE_RESULT
+        )
+
+        if(
+            NOT CRYPTOMACHINE_CLANG_RESOURCE_RESULT EQUAL 0 OR
+            CRYPTOMACHINE_CLANG_RESOURCE_DIR STREQUAL ""
+        )
+            message(
+                FATAL_ERROR
+                "Could not locate the Clang resource directory"
+            )
+        endif()
+
+        set(
+            CRYPTOMACHINE_ASAN_RUNTIME_DLL
+            "${CRYPTOMACHINE_CLANG_RESOURCE_DIR}/lib/windows/clang_rt.asan_dynamic-x86_64.dll"
+        )
+
+        if(NOT EXISTS "${CRYPTOMACHINE_ASAN_RUNTIME_DLL}")
+            message(
+                FATAL_ERROR
+                "Could not locate the Windows Clang ASan runtime DLL: ${CRYPTOMACHINE_ASAN_RUNTIME_DLL}"
+            )
+        endif()
+
+        message(
+            STATUS
+            "CryptoMachine ASan runtime: ${CRYPTOMACHINE_ASAN_RUNTIME_DLL}"
+        )
+    endif()
+
+    add_compile_options(
+        -fsanitize=address,undefined
+        -fno-omit-frame-pointer
+        -fno-sanitize-recover=all
+    )
+
+    add_link_options(
+        -fsanitize=address,undefined
+        -fno-omit-frame-pointer
+        -fno-sanitize-recover=all
+    )
+
+    message(
+        STATUS
+        "CryptoMachine host sanitizers: ENABLED (ASan + UBSan)"
+    )
+else()
+    message(
+        STATUS
+        "CryptoMachine host sanitizers: DISABLED"
+    )
+endif()
+
 add_subdirectory(firmware/core)
 
 add_executable(
@@ -237,3 +336,41 @@ add_test(
     NAME cpp_inactivity_policy
     COMMAND test_cpp_inactivity_policy
 )
+
+if(CRYPTOMACHINE_HOST_SANITIZERS AND WIN32)
+    set(
+        CRYPTOMACHINE_HOST_TEST_TARGETS
+        test_cpp_dice_policy
+        test_cpp_sha256
+        test_cpp_bip39
+        test_cpp_dice_entropy
+        test_cpp_seed_pipeline
+        test_cpp_dice_sanity
+        test_cpp_seed_engine
+        test_cpp_secure_zero
+        test_cpp_dice_session
+        test_cpp_seed_ceremony
+        test_cpp_ui_state_machine
+        test_cpp_ui_abuse
+        test_cpp_seed_app_controller
+        test_cpp_inactivity_policy
+    )
+
+    foreach(
+        CRYPTOMACHINE_HOST_TEST_TARGET
+        IN LISTS CRYPTOMACHINE_HOST_TEST_TARGETS
+    )
+        add_custom_command(
+            TARGET
+                ${CRYPTOMACHINE_HOST_TEST_TARGET}
+            POST_BUILD
+            COMMAND
+                ${CMAKE_COMMAND}
+                -E
+                copy_if_different
+                "${CRYPTOMACHINE_ASAN_RUNTIME_DLL}"
+                "$<TARGET_FILE_DIR:${CRYPTOMACHINE_HOST_TEST_TARGET}>"
+            VERBATIM
+        )
+    endforeach()
+endif()
