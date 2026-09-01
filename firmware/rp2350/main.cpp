@@ -315,6 +315,7 @@ int main() {
         );
     }
 
+
     display_fill(0x0000);
 
     CM_DEV_LOG(

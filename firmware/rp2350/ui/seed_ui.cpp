@@ -1209,9 +1209,79 @@ void render_dice_entry() {
 
     create_header(
         "Dice Entry",
-        "Roll five dice and enter them "
-        "in fixed D1-D5 order."
+        ""
     );
+
+    SeedAppController* controller =
+        app_or_fault();
+
+    if (controller == nullptr) {
+        return;
+    }
+
+    static const char* const shake_progress_10[] = {
+        "SHAKE 1 OF 10",
+        "SHAKE 2 OF 10",
+        "SHAKE 3 OF 10",
+        "SHAKE 4 OF 10",
+        "SHAKE 5 OF 10",
+        "SHAKE 6 OF 10",
+        "SHAKE 7 OF 10",
+        "SHAKE 8 OF 10",
+        "SHAKE 9 OF 10",
+        "SHAKE 10 OF 10"
+    };
+
+    static const char* const shake_progress_20[] = {
+        "SHAKE 1 OF 20",
+        "SHAKE 2 OF 20",
+        "SHAKE 3 OF 20",
+        "SHAKE 4 OF 20",
+        "SHAKE 5 OF 20",
+        "SHAKE 6 OF 20",
+        "SHAKE 7 OF 20",
+        "SHAKE 8 OF 20",
+        "SHAKE 9 OF 20",
+        "SHAKE 10 OF 20",
+        "SHAKE 11 OF 20",
+        "SHAKE 12 OF 20",
+        "SHAKE 13 OF 20",
+        "SHAKE 14 OF 20",
+        "SHAKE 15 OF 20",
+        "SHAKE 16 OF 20",
+        "SHAKE 17 OF 20",
+        "SHAKE 18 OF 20",
+        "SHAKE 19 OF 20",
+        "SHAKE 20 OF 20"
+    };
+
+    const std::size_t completed_shakes =
+        controller->shake_count();
+
+    const std::size_t total_shakes =
+        controller->total_shakes();
+
+    if (
+        total_shakes != 10 &&
+        total_shakes != 20
+    ) {
+        latch_ui_fault(
+            SeedUiFault::UnexpectedApplicationState
+        );
+        return;
+    }
+
+    if (completed_shakes >= total_shakes) {
+        latch_ui_fault(
+            SeedUiFault::UnexpectedApplicationState
+        );
+        return;
+    }
+
+    const char* shake_progress_text =
+        total_shakes == 20
+            ? shake_progress_20[completed_shakes]
+            : shake_progress_10[completed_shakes];
 
     static const char* const prompts[] = {
         "Enter D1",
@@ -1220,6 +1290,16 @@ void render_dice_entry() {
         "Enter D4",
         "Enter D5",
         "Five dice entered"
+    };
+
+    // Fixed physical-die color mapping. Keep each colored die in the
+    // same D1-D5 position for every shake.
+    const std::array<lv_color_t, kDiceCount> die_prompt_colors = {
+        lv_color_hex(0xFF5A5F),  // D1 red
+        lv_color_hex(0x4DA3FF),  // D2 blue
+        lv_color_hex(0x48D597),  // D3 green
+        lv_color_hex(0xFFD166),  // D4 yellow
+        lv_color_hex(0xC77DFF)   // D5 purple
     };
 
     static const char* const progress[] = {
@@ -1236,11 +1316,27 @@ void render_dice_entry() {
             ? g_dice_entry_count
             : kDiceCount;
 
+    lv_obj_t* shake_progress_label =
+        make_label(
+            shake_progress_text,
+            &lv_font_montserrat_16,
+            kWhite
+        );
+
+    lv_obj_align(
+        shake_progress_label,
+        LV_ALIGN_TOP_MID,
+        0,
+        170
+    );
+
     lv_obj_t* prompt =
         make_label(
             prompts[index],
             &lv_font_montserrat_24,
-            kOrange
+            index < kDiceCount
+                ? die_prompt_colors[index]
+                : kOrange
         );
 
     lv_obj_align(

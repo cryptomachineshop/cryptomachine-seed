@@ -152,6 +152,8 @@ void set_orientation(DisplayOrientation orientation) {
     } else {
         g_width = 320;
         g_height = 480;
+
+        // Waveshare reference portrait value.
         send_data_byte(0x48);
     }
 }
@@ -284,28 +286,55 @@ void display_write_bytes(
 }
 
 void display_fill(std::uint16_t color) {
-    if (!display_set_window(0, 0, g_width, g_height)) {
+    if (
+        !display_set_window(
+            0,
+            0,
+            g_width,
+            g_height
+        )
+    ) {
         return;
     }
 
+    // Keep ST7796 RAMWR pixel data in one continuous CS transaction.
+    // A small reusable chunk avoids the large temporary bring-up buffer.
     constexpr std::size_t kChunkPixels = 64;
-    std::array<std::uint16_t, kChunkPixels> pixels{};
+    std::array<std::uint8_t, kChunkPixels * 2> buffer{};
 
-    pixels.fill(color);
+    const std::uint8_t high =
+        static_cast<std::uint8_t>((color >> 8) & 0xFF);
+    const std::uint8_t low =
+        static_cast<std::uint8_t>(color & 0xFF);
+
+    for (std::size_t i = 0; i < kChunkPixels; ++i) {
+        buffer[i * 2] = high;
+        buffer[i * 2 + 1] = low;
+    }
 
     std::size_t remaining =
         static_cast<std::size_t>(g_width) *
         static_cast<std::size_t>(g_height);
 
+    gpio_put(kLcdDataCommandPin, 1);
+    select_display();
+
     while (remaining > 0) {
         const std::size_t count =
-            remaining < pixels.size()
+            remaining < kChunkPixels
                 ? remaining
-                : pixels.size();
+                : kChunkPixels;
 
-        display_write_pixels(pixels.data(), count);
+        spi_write_blocking(
+            spi0,
+            buffer.data(),
+            count * 2
+        );
+
         remaining -= count;
     }
+
+    deselect_display();
 }
 
 }  // namespace cryptomachine::hardware

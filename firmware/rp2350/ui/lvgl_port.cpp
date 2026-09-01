@@ -140,14 +140,14 @@ void display_flush_callback(
         pixel_count * sizeof(lv_color_t)
     );
 
-    // Mnemonic glyphs can exist here as raw RGB565 pixels.
-    // Scrub the flushed region before returning ownership of
-    // the buffer to LVGL.
-    wipe_pixel_buffer(
-        color_buffer,
-        pixel_count
-    );
-
+    // Do not scrub the active LVGL draw buffer before flush-ready.
+    // Hardware testing confirmed that overwriting it at this point
+    // corrupts subsequent rendering.
+    //
+    // Sensitive pixels are scrubbed at explicit security boundaries
+    // such as session destruction, inactivity expiry, and fatal-fault
+    // handling. The abandoned-transfer failure path above is still
+    // scrubbed immediately.
     lv_disp_flush_ready(driver);
 }
 
@@ -309,6 +309,7 @@ bool lvgl_port_init() {
         static_cast<lv_coord_t>(
             cryptomachine::hardware::kDisplayHeight
         );
+
 
     g_display_driver.flush_cb =
         display_flush_callback;
