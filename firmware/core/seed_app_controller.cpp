@@ -445,6 +445,20 @@ SeedAppController::mnemonic_review_finish() {
     );
 }
 
+SeedAppStatus
+SeedAppController::entropy_details_open() {
+    return map_ui_status(
+        ui_.entropy_details_open()
+    );
+}
+
+SeedAppStatus
+SeedAppController::entropy_details_back() {
+    return map_ui_status(
+        ui_.entropy_details_back()
+    );
+}
+
 // ------------------------------------------------------------
 // SECURE DESTRUCTION
 // ------------------------------------------------------------

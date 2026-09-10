@@ -167,6 +167,10 @@ public:
 
     SeedAppStatus mnemonic_review_finish();
 
+    SeedAppStatus entropy_details_open();
+
+    SeedAppStatus entropy_details_back();
+
     // --------------------------------------------------------
     // SECURE DESTRUCTION
     // --------------------------------------------------------

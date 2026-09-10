@@ -17,6 +17,7 @@ enum class UIState {
     DiceGenerateConfirm,
     MnemonicWordView,
     MnemonicFullReview,
+    EntropyDetails,
     SessionDestroyConfirm,
 
     FinalWordMode,
@@ -115,6 +116,10 @@ public:
     UIActionStatus mnemonic_words_complete();
 
     UIActionStatus mnemonic_review_finish();
+
+    UIActionStatus entropy_details_open();
+
+    UIActionStatus entropy_details_back();
 
     // FINAL WORD TOOL
 

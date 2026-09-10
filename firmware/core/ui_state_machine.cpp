@@ -13,6 +13,7 @@ bool is_sensitive_ui_state(
         case UIState::DiceGenerateConfirm:
         case UIState::MnemonicWordView:
         case UIState::MnemonicFullReview:
+        case UIState::EntropyDetails:
         case UIState::SessionDestroyConfirm:
         case UIState::FinalWordEntry:
         case UIState::FinalWordResults:
@@ -330,6 +331,32 @@ UIActionStatus UIStateMachine::mnemonic_review_finish() {
     }
 
     return request_destroy();
+}
+
+UIActionStatus UIStateMachine::entropy_details_open() {
+    if (!require_state(UIState::MnemonicFullReview)) {
+        return UIActionStatus::InvalidState;
+    }
+
+    if (!mnemonic_generated_) {
+        return UIActionStatus::MnemonicNotGenerated;
+    }
+
+    set_state(UIState::EntropyDetails);
+    return UIActionStatus::Success;
+}
+
+UIActionStatus UIStateMachine::entropy_details_back() {
+    if (!require_state(UIState::EntropyDetails)) {
+        return UIActionStatus::InvalidState;
+    }
+
+    if (!mnemonic_generated_) {
+        return UIActionStatus::MnemonicNotGenerated;
+    }
+
+    set_state(UIState::MnemonicFullReview);
+    return UIActionStatus::Success;
 }
 
 // ------------------------------------------------------------

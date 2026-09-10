@@ -435,6 +435,7 @@ void render_dice_sanity_warning();
 void render_dice_generate_confirm();
 void render_mnemonic_word_view();
 void render_mnemonic_full_review();
+void render_entropy_details();
 void render_session_destroy_confirm();
 
 void begin_dice_entry_event(
@@ -878,6 +879,50 @@ void mnemonic_review_finish_event(
 
     render_after_controller_action(
         app->mnemonic_review_finish()
+    );
+}
+
+void entropy_details_open_event(
+    lv_event_t* event
+) {
+    if (
+        lv_event_get_code(event) !=
+        LV_EVENT_CLICKED
+    ) {
+        return;
+    }
+
+    SeedAppController* app =
+        app_or_fault();
+
+    if (app == nullptr) {
+        return;
+    }
+
+    render_after_controller_action(
+        app->entropy_details_open()
+    );
+}
+
+void entropy_details_back_event(
+    lv_event_t* event
+) {
+    if (
+        lv_event_get_code(event) !=
+        LV_EVENT_CLICKED
+    ) {
+        return;
+    }
+
+    SeedAppController* app =
+        app_or_fault();
+
+    if (app == nullptr) {
+        return;
+    }
+
+    render_after_controller_action(
+        app->entropy_details_back()
     );
 }
 
@@ -2055,10 +2100,33 @@ void render_mnemonic_full_review() {
         );
     }
 
+    lv_obj_t* entropy =
+        make_button(
+            "ENTROPY",
+            135,
+            50,
+            kButtonDark,
+            kWhite
+        );
+
+    lv_obj_align(
+        entropy,
+        LV_ALIGN_BOTTOM_LEFT,
+        8,
+        -8
+    );
+
+    lv_obj_add_event_cb(
+        entropy,
+        entropy_details_open_event,
+        LV_EVENT_CLICKED,
+        nullptr
+    );
+
     lv_obj_t* finish =
         make_button(
             "FINISH & DESTROY",
-            220,
+            165,
             50,
             kOrange,
             kBackground
@@ -2066,14 +2134,129 @@ void render_mnemonic_full_review() {
 
     lv_obj_align(
         finish,
-        LV_ALIGN_BOTTOM_MID,
-        0,
+        LV_ALIGN_BOTTOM_RIGHT,
+        -8,
         -8
     );
 
     lv_obj_add_event_cb(
         finish,
         mnemonic_review_finish_event,
+        LV_EVENT_CLICKED,
+        nullptr
+    );
+}
+
+void render_entropy_details() {
+    prepare_screen();
+
+    const SeedResult* result =
+        g_app != nullptr
+            ? g_app->seed_result()
+            : nullptr;
+
+    if (
+        result == nullptr ||
+        (
+            result->mnemonic.word_count !=
+                kWordCount12 &&
+            result->mnemonic.word_count !=
+                kWordCount24
+        )
+    ) {
+        latch_ui_fault(
+            SeedUiFault::InvalidSeedResult
+        );
+        return;
+    }
+
+    create_header(
+        "Entropy Details",
+        "How the dice ceremony maps to BIP39."
+    );
+
+    const bool is_24_word =
+        result->mnemonic.word_count ==
+        kWordCount24;
+
+    const char* details =
+        is_24_word
+            ? "Physical dice rolls: 100\n"
+              "Theoretical entropy: 258.50 bits\n"
+              "BIP39 entropy: 256 bits\n"
+              "Checksum: 8 bits\n"
+              "Mnemonic words: 24\n"
+              "Valid phrase space: 2^256 (~1.16e77)\n"
+              "\n"
+              "Conditioning:\n"
+              "SHA-256 -> first 256 bits -> BIP39\n"
+              "\n"
+              "Entropy source: Physical D6 dice\n"
+              "Device RNG: Not used\n"
+              "Network: None"
+            : "Physical dice rolls: 50\n"
+              "Theoretical entropy: 129.25 bits\n"
+              "BIP39 entropy: 128 bits\n"
+              "Checksum: 4 bits\n"
+              "Mnemonic words: 12\n"
+              "Valid phrase space: 2^128 (~3.40e38)\n"
+              "\n"
+              "Conditioning:\n"
+              "SHA-256 -> first 128 bits -> BIP39\n"
+              "\n"
+              "Entropy source: Physical D6 dice\n"
+              "Device RNG: Not used\n"
+              "Network: None";
+
+    lv_obj_t* body =
+        make_label(
+            details,
+            &lv_font_montserrat_14,
+            kWhite
+        );
+
+    lv_obj_set_width(
+        body,
+        286
+    );
+
+    lv_label_set_long_mode(
+        body,
+        LV_LABEL_LONG_WRAP
+    );
+
+    lv_obj_set_style_text_align(
+        body,
+        LV_TEXT_ALIGN_LEFT,
+        0
+    );
+
+    lv_obj_align(
+        body,
+        LV_ALIGN_TOP_MID,
+        0,
+        184
+    );
+
+    lv_obj_t* back =
+        make_button(
+            "BACK TO REVIEW",
+            190,
+            50,
+            kButtonDark,
+            kWhite
+        );
+
+    lv_obj_align(
+        back,
+        LV_ALIGN_BOTTOM_MID,
+        0,
+        -8
+    );
+
+    lv_obj_add_event_cb(
+        back,
+        entropy_details_back_event,
         LV_EVENT_CLICKED,
         nullptr
     );
@@ -2406,6 +2589,10 @@ void seed_ui_render() {
 
         case UIState::MnemonicFullReview:
             render_mnemonic_full_review();
+            break;
+
+        case UIState::EntropyDetails:
+            render_entropy_details();
             break;
 
         case UIState::SessionDestroyConfirm:
