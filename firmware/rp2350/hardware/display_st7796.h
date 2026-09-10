@@ -49,6 +49,19 @@ void display_write_bytes(
     std::size_t byte_count
 );
 
+// Atomically set an ST7796 drawing window and write its RGB565 bytes.
+//
+// x_end and y_end are exclusive. The entire CASET/RASET/RAMWR/pixel
+// sequence is transmitted under one chip-select assertion.
+bool display_write_window_bytes(
+    std::uint16_t x_start,
+    std::uint16_t y_start,
+    std::uint16_t x_end,
+    std::uint16_t y_end,
+    const std::uint8_t* data,
+    std::size_t byte_count
+);
+
 // Fill the entire display with one RGB565 color.
 void display_fill(std::uint16_t color);
 

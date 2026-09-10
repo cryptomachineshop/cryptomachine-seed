@@ -109,18 +109,20 @@ void display_flush_callback(
         static_cast<std::uint16_t>(
             area->y2 + 1
         );
-
     if (
-        !cryptomachine::hardware::display_set_window(
+        !cryptomachine::hardware::display_write_window_bytes(
             x_start,
             y_start,
             x_end,
-            y_end
+            y_end,
+            reinterpret_cast<const std::uint8_t*>(
+                color_buffer
+            ),
+            pixel_count * sizeof(lv_color_t)
         )
     ) {
-        // LVGL may already have rendered sensitive pixels
-        // into the draw buffer even if the display transfer
-        // cannot proceed.
+        // LVGL may already have rendered sensitive pixels into the
+        // draw buffer even when the display transfer cannot proceed.
         wipe_pixel_buffer(
             color_buffer,
             pixel_count
@@ -130,17 +132,7 @@ void display_flush_callback(
         return;
     }
 
-    // This write is blocking. When it returns, the ST7796
-    // has consumed the bytes and the RAM copy is no longer
-    // needed.
-    cryptomachine::hardware::display_write_bytes(
-        reinterpret_cast<const std::uint8_t*>(
-            color_buffer
-        ),
-        pixel_count * sizeof(lv_color_t)
-    );
-
-    // Do not scrub the active LVGL draw buffer before flush-ready.
+// Do not scrub the active LVGL draw buffer before flush-ready.
     // Hardware testing confirmed that overwriting it at this point
     // corrupts subsequent rendering.
     //

@@ -285,6 +285,97 @@ void display_write_bytes(
     deselect_display();
 }
 
+bool display_write_window_bytes(
+    std::uint16_t x_start,
+    std::uint16_t y_start,
+    std::uint16_t x_end,
+    std::uint16_t y_end,
+    const std::uint8_t* data,
+    std::size_t byte_count
+) {
+    if (
+        data == nullptr ||
+        byte_count == 0 ||
+        x_start >= x_end ||
+        y_start >= y_end ||
+        x_end > g_width ||
+        y_end > g_height
+    ) {
+        return false;
+    }
+
+    const std::size_t width =
+        static_cast<std::size_t>(x_end - x_start);
+
+    const std::size_t height =
+        static_cast<std::size_t>(y_end - y_start);
+
+    const std::size_t expected_byte_count =
+        width * height * 2U;
+
+    if (byte_count != expected_byte_count) {
+        return false;
+    }
+
+    const std::uint16_t x_last =
+        static_cast<std::uint16_t>(x_end - 1);
+
+    const std::uint16_t y_last =
+        static_cast<std::uint16_t>(y_end - 1);
+
+    const std::array<std::uint8_t, 4> x_coordinates{
+        static_cast<std::uint8_t>((x_start >> 8) & 0xFF),
+        static_cast<std::uint8_t>(x_start & 0xFF),
+        static_cast<std::uint8_t>((x_last >> 8) & 0xFF),
+        static_cast<std::uint8_t>(x_last & 0xFF),
+    };
+
+    const std::array<std::uint8_t, 4> y_coordinates{
+        static_cast<std::uint8_t>((y_start >> 8) & 0xFF),
+        static_cast<std::uint8_t>(y_start & 0xFF),
+        static_cast<std::uint8_t>((y_last >> 8) & 0xFF),
+        static_cast<std::uint8_t>(y_last & 0xFF),
+    };
+
+    // Hardware validation on the target panel showed that repeated
+    // partial-window updates are reliable when CASET, RASET, RAMWR,
+    // and the pixel payload remain in one CS-low transaction.
+    select_display();
+
+    std::uint8_t command = 0x2A;
+    gpio_put(kLcdDataCommandPin, 0);
+    spi_write_blocking(spi0, &command, 1);
+    gpio_put(kLcdDataCommandPin, 1);
+    spi_write_blocking(
+        spi0,
+        x_coordinates.data(),
+        x_coordinates.size()
+    );
+
+    command = 0x2B;
+    gpio_put(kLcdDataCommandPin, 0);
+    spi_write_blocking(spi0, &command, 1);
+    gpio_put(kLcdDataCommandPin, 1);
+    spi_write_blocking(
+        spi0,
+        y_coordinates.data(),
+        y_coordinates.size()
+    );
+
+    command = 0x2C;
+    gpio_put(kLcdDataCommandPin, 0);
+    spi_write_blocking(spi0, &command, 1);
+    gpio_put(kLcdDataCommandPin, 1);
+    spi_write_blocking(
+        spi0,
+        data,
+        byte_count
+    );
+
+    deselect_display();
+    return true;
+}
+
 void display_fill(std::uint16_t color) {
     if (
         !display_set_window(
