@@ -346,4 +346,4 @@ These values should accompany the official release.
 
 **Roll. Verify. Write. Destroy.**
 
-https://cryptomachine.shop/
+https://cryptomachine.shop/product/cryptomachine-seed/

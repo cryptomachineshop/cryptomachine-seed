@@ -34,7 +34,7 @@ Only hardware, firmware releases, downloads, and services identified by CryptoMa
 
 Official project website:
 
-https://cryptomachine.shop/
+https://cryptomachine.shop/product/cryptomachine-seed/
 
 Official source repository:
 

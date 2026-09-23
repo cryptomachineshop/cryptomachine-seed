@@ -293,4 +293,4 @@ Before publishing a production release, confirm all of the following:
 
 **Roll. Verify. Write. Destroy.**
 
-https://cryptomachine.shop/
+https://cryptomachine.shop/product/cryptomachine-seed/

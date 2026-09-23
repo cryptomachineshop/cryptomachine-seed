@@ -226,4 +226,4 @@ Third-party wallets, backup products, verification tools, operating systems, bro
 
 **Roll. Verify. Write. Destroy.**
 
-https://cryptomachine.shop/
+https://cryptomachine.shop/product/cryptomachine-seed/

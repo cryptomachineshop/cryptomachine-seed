@@ -234,4 +234,4 @@ Never send a real recovery phrase, private key, or wallet secret in a report.
 
 **Roll. Verify. Write. Destroy.**
 
-https://cryptomachine.shop/
+https://cryptomachine.shop/product/cryptomachine-seed/

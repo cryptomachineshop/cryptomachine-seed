@@ -169,4 +169,4 @@ Never include a real recovery phrase or private wallet material in a bug report.
 
 **Roll. Verify. Write. Destroy.**
 
-https://cryptomachine.shop/
+https://cryptomachine.shop/product/cryptomachine-seed/
