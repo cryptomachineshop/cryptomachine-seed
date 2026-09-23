@@ -141,13 +141,15 @@ Production releases are intended to be built with hardened release settings, inc
 
 The exact release procedure will be documented before V1 is made public.
 
-## Open Source and Branding
+## License and Branding
 
-CryptoMachine Seed is intended to be published as open-source firmware.
+CryptoMachine Seed firmware is licensed under the **GNU General Public License version 3.0 (GPLv3)**.
 
-The final software license will be selected before the public V1 release.
+See `LICENSE` for the complete software license.
 
-**CryptoMachine** and **CryptoMachine Seed** branding are separate from the software license. Publication of the source code will not grant permission to represent modified or third-party hardware as an official CryptoMachine product.
+**CryptoMachine** and **CryptoMachine Seed** branding are not licensed under the GPLv3. Forks and modified versions must not imply that they are official CryptoMachine products.
+
+See `TRADEMARK.md` for the project branding policy.
 
 ## Safety
 
