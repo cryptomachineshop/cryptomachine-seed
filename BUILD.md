@@ -66,6 +66,35 @@ Build type: Debug
 C++ compiler: clang++
 ```
 
+### Known-Working Toolchain Snapshot
+
+The current validated development environment is:
+
+```text
+Raspberry Pi Pico SDK: 2.3.0
+Pico SDK commit: 98a542c1a62fb549ffb5d66a3e5892b06276b670
+
+CMake: 4.4.2
+Ninja: 1.13.2
+Clang: 22.1.8
+Arm GNU Toolchain: 12.2.MPACBTI-Rel1
+arm-none-eabi-gcc: 12.2.1 20230214
+
+picotool: 2.3.0
+picotool commit: 6f6458d792b93685a11423b244a585eaa99eafcf
+```
+
+The current build-tree copy of picotool is generated under `build-rp2350/_deps/` and is not installed globally or required to be on `PATH`.
+
+The current Windows picotool build reports:
+
+```text
+picotool v2.3.0 (Windows, Clang-22.1.8, Debug)
+USB support: not compiled in
+```
+
+This snapshot documents the environment that is known to build the project successfully. The final production release should record its own exact toolchain and dependency versions again before the release artifact is published.
+
 The local Pico SDK path shown above is only an example. Use the actual path to your Pico SDK checkout.
 
 Before public V1, the exact Pico SDK revision used for the production release should be recorded in the release notes.
@@ -326,6 +355,7 @@ For an official V1 release, record at minimum:
 - Arm GNU Toolchain version
 - CMake version
 - Ninja version
+- picotool version and source revision
 - production CMake options
 - firmware SHA-256
 
