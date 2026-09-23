@@ -101,10 +101,10 @@ CryptoMachine Seed includes a portable core separated from the RP2350-specific h
 
 The project is organized so deterministic seed-generation logic can be tested independently from the hardware target.
 
-- `firmware/core/` — portable dice, SHA-256, BIP39, ceremony, state-machine, secure-zero, and application logic
-- `firmware/rp2350/` — RP2350 hardware, display, touch, LVGL UI, and device entry point
-- `tools/` — release and verification tooling
-- host tests — deterministic and state-machine regression coverage
+- `firmware/core/` : portable dice, SHA-256, BIP39, ceremony, state-machine, secure-zero, and application logic
+- `firmware/rp2350/` : RP2350 hardware, display, touch, LVGL UI, and device entry point
+- `tools/` : release and verification tooling
+- host tests : deterministic and state-machine regression coverage
 
 ## Testing and Verification
 
