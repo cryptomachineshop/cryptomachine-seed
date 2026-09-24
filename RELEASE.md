@@ -83,7 +83,7 @@ CRYPTOMACHINE_STACK_USAGE_ANALYSIS=ON
 Example configuration:
 
 ```powershell
-cmake -S . -B .\build-rp2350-release `
+cmake -S .\firmware\rp2350 -B .\build-rp2350-release -G Ninja `
   -DCRYPTOMACHINE_PRODUCTION_RELEASE=ON `
   -DCRYPTOMACHINE_DEV_LOGGING=OFF `
   -DCRYPTOMACHINE_SIGN_FIRMWARE=ON `
