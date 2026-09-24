@@ -1,3 +1,10 @@
+## Get Started
+
+New to CryptoMachine Seed?
+
+**[Read the Quick Start Guide](docs/QUICKSTART.md)**
+
+
 # CryptoMachine Seed
 
 **Roll. Verify. Write. Destroy.**
