@@ -2,6 +2,14 @@
 
 **Roll. Verify. Write. Destroy.**
 
+<p align="center">
+  <img
+    src="docs/images/cryptomachine-seed-hero-01.png"
+    alt="CryptoMachine Seed offline BIP39 seed generator with touchscreen, stand, dice cup, and USB power connection"
+    width="800"
+  >
+</p>
+
 CryptoMachine Seed is a dedicated offline BIP39 seed phrase generator that uses user-supplied physical dice entropy.
 
 The device is designed to do one job well: guide a user through creating a 12-word or 24-word BIP39 recovery phrase from physical dice entropy, allow the generation process and result to be reviewed, and then clear the active ceremony.
@@ -122,6 +130,23 @@ It does not:
 - Require a network connection
 
 CryptoMachine Seed is a seed-generation appliance, not a hardware wallet.
+
+## CryptoMachine Seed Hardware
+
+<p align="center">
+  <img
+    src="docs/images/cryptomachine-seed-flat-01.jpeg"
+    alt="CryptoMachine Seed complete kit with touchscreen device, stand, five physical dice, dice shaker cup, and USB data blocker"
+    width="48%"
+  >
+  <img
+    src="docs/images/cryptomachine-seed%20(3).PNG"
+    alt="CryptoMachine Seed touchscreen device powered on in its stand with dice shaker cup"
+    width="48%"
+  >
+</p>
+
+The CryptoMachine Seed system combines the dedicated touchscreen device with the physical tools used during the dice-based seed-generation ceremony.
 
 ## Reference Hardware
 
