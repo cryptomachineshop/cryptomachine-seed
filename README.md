@@ -137,12 +137,15 @@ CryptoMachine Seed is a seed-generation appliance, not a hardware wallet.
   <img
     src="docs/images/cryptomachine-seed-flat-01.jpeg"
     alt="CryptoMachine Seed complete kit with touchscreen device, stand, five physical dice, dice shaker cup, and USB data blocker"
-    width="48%"
+    width="700"
   >
+</p>
+
+<p align="center">
   <img
     src="docs/images/cryptomachine-seed%20(3).PNG"
     alt="CryptoMachine Seed touchscreen device powered on in its stand with dice shaker cup"
-    width="48%"
+    width="500"
   >
 </p>
 
