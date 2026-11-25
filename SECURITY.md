@@ -4,9 +4,11 @@ CryptoMachine Seed is a dedicated offline BIP39 seed phrase generator that uses 
 
 This document describes the current security model, assumptions, limitations, and reporting expectations for the project.
 
-> **Project status:** Pre-release / hardware beta.
+
+> Project status: Production release v1.0.0, published September 24, 2026.
 >
-> Use **test seeds only** until a production release is published.
+> Production release does not eliminate hardware trust assumptions or guarantee complete forensic erasure of sensitive data. Review the security model and limitations below before use.
+
 
 ## Security Goals
 
